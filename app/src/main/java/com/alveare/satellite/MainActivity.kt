@@ -2,6 +2,7 @@ package com.alveare.satellite
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
@@ -20,6 +21,7 @@ import com.alveare.satellite.network.AlveareLiveWebSocket
 import com.alveare.satellite.tts.AndroidNativeTts
 import com.alveare.satellite.ui.VisualizerView
 import com.alveare.satellite.wakeword.WakeWordDetector
+import com.google.android.material.button.MaterialButton
 
 class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketListener {
 
@@ -67,37 +69,81 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
         updateBadges()
 
+        // 1. Connection Triggers (Click on Pill or Banner to connect/reconnect)
+        binding.statusPill.setOnClickListener {
+            connectWebSocket()
+        }
+
+        binding.btnBannerConnect.setOnClickListener {
+            connectWebSocket()
+        }
+
+        binding.layoutConnectionBanner.setOnClickListener {
+            connectWebSocket()
+        }
+
+        // 2. Listen Mode Quick Toggle (Tap badge to switch between Continuous and Push-to-Talk)
+        binding.badgeListenMode.setOnClickListener {
+            toggleListenMode()
+        }
+
+        // 3. Settings Button
         binding.btnSettings.setOnClickListener {
             showSettingsDialog()
         }
 
+        // 4. Push-To-Talk Mic Button
         binding.btnMic.setOnClickListener {
             handleMicButtonClicked()
         }
 
+        // 5. Interrupt Button
         binding.btnInterrupt.setOnClickListener {
             interruptSession()
         }
     }
 
+    private fun toggleListenMode() {
+        if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            prefs.listenMode = AppPreferences.LISTEN_MODE_PUSH_TO_TALK
+            captureManager?.isContinuousMode = false
+            captureManager?.stopStreaming()
+            binding.visualizerView.setState(VisualizerView.State.IDLE)
+            binding.tvStateLabel.text = getString(R.string.status_ready)
+            binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            Toast.makeText(this, "Modalità: Tocca per parlare (Push-to-Talk)", Toast.LENGTH_SHORT).show()
+        } else {
+            prefs.listenMode = AppPreferences.LISTEN_MODE_CONTINUOUS
+            captureManager?.isContinuousMode = true
+            captureManager?.startStreaming()
+            binding.visualizerView.setState(VisualizerView.State.IDLE)
+            binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
+            binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+            Toast.makeText(this, "Modalità: Sempre in ascolto (Smart Speaker)", Toast.LENGTH_SHORT).show()
+        }
+        updateBadges()
+    }
+
     private fun updateBadges() {
+        val listenLabel = if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            "🎙️ Sempre in ascolto"
+        } else {
+            "👆 Tocca per parlare"
+        }
+        binding.badgeListenMode.text = listenLabel
+        binding.badgeListenMode.setTextColor(
+            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
+                ContextCompat.getColor(this, R.color.secondary)
+            else
+                ContextCompat.getColor(this, R.color.text_muted)
+        )
+
         val ttsLabel = if (prefs.ttsMode == AppPreferences.MODE_SERVER) {
-            "🔊 TTS: Server (Kokoro)"
+            "🔊 TTS: Kokoro 24kHz"
         } else {
             "🔊 TTS: Device (Nativo)"
         }
         binding.badgeTtsMode.text = ttsLabel
-
-        val wakeLabel = if (prefs.isWakeWordEnabled) {
-            "👂 Wake Word: Ehi Alveare"
-        } else {
-            "👂 Wake Word: Spenta"
-        }
-        binding.badgeWakeWord.text = wakeLabel
-        binding.badgeWakeWord.setTextColor(
-            if (prefs.isWakeWordEnabled) ContextCompat.getColor(this, R.color.secondary)
-            else ContextCompat.getColor(this, R.color.text_muted)
-        )
     }
 
     private fun initAudioEngines() {
@@ -149,17 +195,31 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             onAmplitudeChanged = { amp ->
                 runOnUiThread {
                     binding.visualizerView.setAmplitude(amp)
+
+                    // Real-time Mic Level Feedback Bar (VU meter)
+                    val progress = (amp * 100).toInt().coerceIn(0, 100)
+                    binding.pbMicLevel.progress = progress
+
+                    if (amp > 0.12f) {
+                        binding.tvMicLevelLabel.text = "🎙️ Voce ($progress%)"
+                        binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.secondary))
+                    } else {
+                        binding.tvMicLevelLabel.text = "🎙️ Mic pronto"
+                        binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_muted))
+                    }
                 }
                 wakeWordDetector?.processAudioSample(amp)
             },
             onSilenceDetected = {
                 runOnUiThread {
-                    if (captureManager?.isStreamingAudio?.get() == true) {
+                    if (captureManager?.isStreamingAudio?.get() == true && prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
                         finishListeningAndProcess()
                     }
                 }
             }
-        )
+        ).apply {
+            isContinuousMode = (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
+        }
     }
 
     private fun checkPermissionsAndStart() {
@@ -217,7 +277,12 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
 
         if (captureManager?.isStreamingAudio?.get() == true) {
-            finishListeningAndProcess()
+            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+                // If in continuous mode, clicking mic can trigger manual interrupt / flush
+                interruptSession()
+            } else {
+                finishListeningAndProcess()
+            }
         } else {
             startListeningSession(isWakeWordTriggered = false)
         }
@@ -233,13 +298,14 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.secondary)
         binding.btnInterrupt.visibility = View.VISIBLE
 
-        // Reset conversation cards for new turn
         currentAssistantText.clear()
         binding.cardTool.visibility = View.GONE
     }
 
     private fun finishListeningAndProcess() {
-        captureManager?.stopStreaming()
+        if (prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            captureManager?.stopStreaming()
+        }
         SoundEffects.playProcessingChime()
 
         binding.visualizerView.setState(VisualizerView.State.PROCESSING)
@@ -254,11 +320,16 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
         playbackManager?.stopAndFlush()
         nativeTts?.stop()
-        captureManager?.stopStreaming()
+        if (prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            captureManager?.stopStreaming()
+        }
 
         setAssistantSpeakingState(false)
         binding.visualizerView.setState(VisualizerView.State.IDLE)
-        binding.tvStateLabel.text = getString(R.string.status_ready)
+        binding.tvStateLabel.text = if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
+            "Sempre in ascolto (parla liberamente)"
+        else
+            getString(R.string.status_ready)
         binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
         binding.btnInterrupt.visibility = View.GONE
         binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
@@ -273,7 +344,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             binding.btnInterrupt.visibility = View.VISIBLE
         } else {
             binding.visualizerView.setState(VisualizerView.State.IDLE)
-            binding.tvStateLabel.text = getString(R.string.status_ready)
+            binding.tvStateLabel.text = if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
+                "Sempre in ascolto (parla liberamente)"
+            else
+                getString(R.string.status_ready)
             binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
             binding.btnInterrupt.visibility = View.GONE
         }
@@ -282,21 +356,92 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     private fun updateConnectionStatus(text: String, color: Int) {
         runOnUiThread {
             binding.tvConnectionStatus.text = text
-            binding.statusDot.backgroundTintList = ContextCompat.getColorStateList(this, R.color.secondary)
-            binding.statusDot.setBackgroundColor(color)
+            binding.statusDot.backgroundTintList = ColorStateList.valueOf(color)
         }
     }
 
     // --- WebSocket Listener Callbacks ---
 
+    override fun onConnecting() {
+        runOnUiThread {
+            updateConnectionStatus("Connessione...", Color.parseColor("#F59E0B"))
+            binding.layoutConnectionBanner.visibility = View.VISIBLE
+            binding.tvBannerTitle.text = "Connessione ad Alveare..."
+            binding.tvBannerSubtitle.text = "Connessione in corso a ${prefs.serverUrl}..."
+            binding.btnBannerConnect.isEnabled = false
+            binding.btnBannerConnect.text = "..."
+        }
+    }
+
     override fun onConnected(sessionId: String?, sampleRate: Int) {
-        updateConnectionStatus("Connesso", Color.parseColor("#10B981"))
-        playbackManager?.setSampleRate(sampleRate)
-        webSocket?.sendConfig(prefs.contextTurns)
+        runOnUiThread {
+            updateConnectionStatus("Connesso", Color.parseColor("#10B981"))
+            binding.layoutConnectionBanner.visibility = View.GONE
+            binding.btnBannerConnect.isEnabled = true
+            binding.btnBannerConnect.text = "Connetti"
+
+            webSocket?.sendConfig(prefs.contextTurns)
+
+            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+                captureManager?.isContinuousMode = true
+                captureManager?.startStreaming()
+                binding.visualizerView.setState(VisualizerView.State.IDLE)
+                binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+            } else {
+                binding.tvStateLabel.text = getString(R.string.status_ready)
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            }
+        }
     }
 
     override fun onDisconnected(reason: String) {
-        updateConnectionStatus("Disconnesso", Color.parseColor("#EF4444"))
+        runOnUiThread {
+            updateConnectionStatus("Disconnesso", Color.parseColor("#EF4444"))
+            binding.layoutConnectionBanner.visibility = View.VISIBLE
+            binding.tvBannerTitle.text = "Server Alveare Disconnesso"
+            binding.tvBannerSubtitle.text = reason
+            binding.btnBannerConnect.isEnabled = true
+            binding.btnBannerConnect.text = "Riconnetti"
+
+            captureManager?.stopStreaming()
+            binding.visualizerView.setState(VisualizerView.State.IDLE)
+            binding.tvStateLabel.text = "Disconnesso da Alveare"
+            binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.accent_red))
+        }
+    }
+
+    override fun onVadSpeechStart() {
+        runOnUiThread {
+            if (!isAssistantSpeaking) {
+                binding.visualizerView.setState(VisualizerView.State.LISTENING)
+                binding.tvStateLabel.text = "In ascolto... (parla ora)"
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+                binding.btnInterrupt.visibility = View.VISIBLE
+                currentAssistantText.clear()
+                binding.cardTool.visibility = View.GONE
+            }
+        }
+    }
+
+    override fun onVadSpeechEnd() {
+        runOnUiThread {
+            if (!isAssistantSpeaking) {
+                SoundEffects.playProcessingChime()
+                binding.visualizerView.setState(VisualizerView.State.PROCESSING)
+                binding.tvStateLabel.text = "Sto elaborando..."
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.primary))
+            }
+        }
+    }
+
+    override fun onTtft(ttftMs: Float) {
+        runOnUiThread {
+            if (ttftMs > 0) {
+                binding.badgeLatency.visibility = View.VISIBLE
+                binding.badgeLatency.text = "⚡ TTFT: ${ttftMs.toInt()} ms"
+            }
+        }
     }
 
     override fun onUserTranscript(text: String, latencyMs: Float) {
@@ -347,6 +492,11 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     override fun onTurnCompleted(turnId: Int) {
         runOnUiThread {
             binding.btnInterrupt.visibility = View.GONE
+            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+                binding.visualizerView.setState(VisualizerView.State.IDLE)
+                binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+            }
         }
     }
 
@@ -373,6 +523,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         val etRoomName = dialogView.findViewById<EditText>(R.id.etRoomName)
         val etServerUrl = dialogView.findViewById<EditText>(R.id.etServerUrl)
         val switchTrustSsl = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchTrustSsl)
+        val btnTestConnection = dialogView.findViewById<MaterialButton>(R.id.btnTestConnection)
+        val btnResetDefaultUrl = dialogView.findViewById<MaterialButton>(R.id.btnResetDefaultUrl)
+        val tvTestResult = dialogView.findViewById<TextView>(R.id.tvTestResult)
+
         val rgTtsMode = dialogView.findViewById<RadioGroup>(R.id.rgTtsMode)
         val rbTtsServer = dialogView.findViewById<RadioButton>(R.id.rbTtsServer)
         val rbTtsDevice = dialogView.findViewById<RadioButton>(R.id.rbTtsDevice)
@@ -381,10 +535,15 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         val tvSpeechRateLabel = dialogView.findViewById<TextView>(R.id.tvSpeechRateLabel)
         val seekPitch = dialogView.findViewById<SeekBar>(R.id.seekPitch)
         val tvPitchLabel = dialogView.findViewById<TextView>(R.id.tvPitchLabel)
+
+        val rgListenMode = dialogView.findViewById<RadioGroup>(R.id.rgListenMode)
+        val rbListenContinuous = dialogView.findViewById<RadioButton>(R.id.rbListenContinuous)
+        val rbListenPushToTalk = dialogView.findViewById<RadioButton>(R.id.rbListenPushToTalk)
         val switchWakeWord = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchWakeWord)
         val switchKeepScreenOn = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchKeepScreenOn)
         val seekContextTurns = dialogView.findViewById<SeekBar>(R.id.seekContextTurns)
         val tvContextTurnsLabel = dialogView.findViewById<TextView>(R.id.tvContextTurnsLabel)
+
         val btnSave = dialogView.findViewById<Button>(R.id.btnSave)
         val btnCancel = dialogView.findViewById<Button>(R.id.btnCancel)
 
@@ -393,6 +552,30 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         etServerUrl.setText(prefs.serverUrl)
         switchTrustSsl.isChecked = prefs.trustSelfSignedSsl
 
+        // Test Connection Button
+        btnTestConnection.setOnClickListener {
+            val testUrl = etServerUrl.text.toString().trim()
+            tvTestResult.visibility = View.VISIBLE
+            tvTestResult.text = "⏳ Test connessione in corso verso $testUrl..."
+            tvTestResult.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+
+            AlveareLiveWebSocket.testServerStatus(testUrl, switchTrustSsl.isChecked) { success, msg ->
+                runOnUiThread {
+                    tvTestResult.text = msg
+                    tvTestResult.setTextColor(
+                        if (success) ContextCompat.getColor(this, R.color.secondary)
+                        else ContextCompat.getColor(this, R.color.accent_red)
+                    )
+                }
+            }
+        }
+
+        // Reset to Default URL Button
+        btnResetDefaultUrl.setOnClickListener {
+            etServerUrl.setText(AppPreferences.DEFAULT_SERVER_URL)
+        }
+
+        // TTS Mode
         if (prefs.ttsMode == AppPreferences.MODE_SERVER) {
             rbTtsServer.isChecked = true
             layoutDeviceTtsSettings.visibility = View.GONE
@@ -403,6 +586,13 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
         rgTtsMode.setOnCheckedChangeListener { _, checkedId ->
             layoutDeviceTtsSettings.visibility = if (checkedId == R.id.rbTtsDevice) View.VISIBLE else View.GONE
+        }
+
+        // Listen Mode
+        if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            rbListenContinuous.isChecked = true
+        } else {
+            rbListenPushToTalk.isChecked = true
         }
 
         seekSpeechRate.progress = ((prefs.speechRate - 0.5f) * 10f).toInt().coerceIn(0, 20)
@@ -445,11 +635,11 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
 
         btnSave.setOnClickListener {
-            val oldUrl = prefs.serverUrl
             prefs.roomName = etRoomName.text.toString().trim()
             prefs.serverUrl = etServerUrl.text.toString().trim()
             prefs.trustSelfSignedSsl = switchTrustSsl.isChecked
             prefs.ttsMode = if (rbTtsServer.isChecked) AppPreferences.MODE_SERVER else AppPreferences.MODE_DEVICE
+            prefs.listenMode = if (rbListenContinuous.isChecked) AppPreferences.LISTEN_MODE_CONTINUOUS else AppPreferences.LISTEN_MODE_PUSH_TO_TALK
             prefs.speechRate = 0.5f + (seekSpeechRate.progress / 10f)
             prefs.pitch = 0.5f + (seekPitch.progress / 10f)
             prefs.isWakeWordEnabled = switchWakeWord.isChecked
@@ -463,12 +653,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             wakeWordDetector?.isEnabled?.set(prefs.isWakeWordEnabled)
             nativeTts?.setSpeechRate(prefs.speechRate)
             nativeTts?.setPitch(prefs.pitch)
+            captureManager?.isContinuousMode = (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
 
-            if (oldUrl != prefs.serverUrl) {
-                connectWebSocket()
-            } else {
-                webSocket?.sendConfig(prefs.contextTurns)
-            }
+            // Always reconnect with new or confirmed settings
+            connectWebSocket()
 
             dialog.dismiss()
         }

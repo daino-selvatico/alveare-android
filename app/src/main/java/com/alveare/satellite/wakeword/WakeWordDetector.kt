@@ -8,34 +8,38 @@ import java.util.concurrent.atomic.AtomicBoolean
  * and triggers voice interaction without waking the cloud.
  */
 class WakeWordDetector(
+    private val isConnectedProvider: () -> Boolean = { true },
     private val onWakeWordDetected: () -> Unit
 ) {
-    val isEnabled = AtomicBoolean(true)
+    val isEnabled = AtomicBoolean(false)
+    var sensitivity = 0.35f // Configurable amplitude threshold (0.20f - 0.60f)
     private var lastTriggerTime = 0L
 
-    // Dual-syllable energy burst detector for "E-hi Al-ve-a-re"
+    // Rhythmic syllable energy burst detector for "E-hi Al-ve-a-re"
     private var energyBurstCount = 0
     private var lastBurstTime = 0L
 
     fun processAudioSample(amplitude: Float) {
         if (!isEnabled.get()) return
+        if (!isConnectedProvider()) return // Never trigger if disconnected from Alveare!
 
         val now = System.currentTimeMillis()
-        if (now - lastTriggerTime < 2500) {
+        if (now - lastTriggerTime < 3000) {
             // Debounce after trigger
             return
         }
 
-        // Detect dynamic vocal rise (voice pitch burst threshold)
-        if (amplitude > 0.45f) {
-            if (now - lastBurstTime in 150..950) {
+        // Detect dynamic vocal rise with configurable sensitivity
+        if (amplitude >= sensitivity) {
+            val delta = now - lastBurstTime
+            if (delta in 150..800) {
                 energyBurstCount++
-                if (energyBurstCount >= 2) { // 2-3 rhythmic syllables
+                if (energyBurstCount >= 3) { // 3 distinct rhythmic syllables
                     energyBurstCount = 0
                     lastTriggerTime = now
                     onWakeWordDetected()
                 }
-            } else if (now - lastBurstTime > 1200) {
+            } else if (delta > 900) {
                 energyBurstCount = 1
             }
             lastBurstTime = now

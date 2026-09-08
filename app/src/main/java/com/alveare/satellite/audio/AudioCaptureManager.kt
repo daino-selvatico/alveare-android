@@ -12,6 +12,7 @@ class AudioCaptureManager(
     private val sampleRate: Int = 16000,
     private val onAudioChunkReady: (ByteArray) -> Unit,
     private val onAmplitudeChanged: (Float) -> Unit,
+    private val onSpeechStarted: () -> Unit = {},
     private val onSilenceDetected: () -> Unit = {}
 ) {
     private var audioRecord: AudioRecord? = null
@@ -19,11 +20,11 @@ class AudioCaptureManager(
     val isStreamingAudio = AtomicBoolean(false)
     private var captureThread: Thread? = null
 
-    // Simple VAD parameters
+    // Adaptive VAD parameters (tuned for natural mobile microphone distance)
     private var speechFramesCount = 0
     private var silenceFramesCount = 0
-    private val speechThresholdRms = 400.0f
-    private val silenceFramesNeeded = 18 // ~360ms of silence at 20ms frames
+    var speechThresholdRms = 140.0f
+    private val silenceFramesNeeded = 16 // ~320ms of silence at 20ms frames
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -77,7 +78,10 @@ class AudioCaptureManager(
                     }
 
                     val rms = sqrt(sumSquare / readCount).toFloat()
-                    val normalizedAmp = (rms / 4000.0f).coerceIn(0.0f, 1.0f)
+                    val normalizedAmp = when {
+                        rms <= 10f -> 0.0f
+                        else -> ((rms - 10f) / 300f).coerceIn(0.0f, 1.0f)
+                    }
                     onAmplitudeChanged(normalizedAmp)
 
                     // 2. If actively streaming to Alveare, forward the chunk and check VAD
@@ -85,24 +89,33 @@ class AudioCaptureManager(
                         val bytesToSend = byteBuffer.copyOf(readCount * 2)
                         onAudioChunkReady(bytesToSend)
 
-                        // VAD Silence Tracking
-                        if (rms >= speechThresholdRms) {
-                            speechFramesCount++
-                            silenceFramesCount = 0
-                        } else {
-                            if (speechFramesCount > 6) { // Spoke at least ~250ms
-                                silenceFramesCount++
-                                if (silenceFramesCount >= silenceFramesNeeded) {
-                                    // Turn-taking silence threshold reached!
-                                    silenceFramesCount = 0
-                                    speechFramesCount = 0
-                                    onSilenceDetected()
+                        // If not in continuous server-managed VAD mode, do client-side silence cutoff
+                        if (!isContinuousMode) {
+                            if (rms >= speechThresholdRms) {
+                                speechFramesCount++
+                                silenceFramesCount = 0
+                            } else {
+                                if (speechFramesCount > 4) { // Spoke at least ~160ms
+                                    silenceFramesCount++
+                                    if (silenceFramesCount >= silenceFramesNeeded) {
+                                        silenceFramesCount = 0
+                                        speechFramesCount = 0
+                                        onSilenceDetected()
+                                    }
                                 }
                             }
                         }
                     } else {
                         silenceFramesCount = 0
-                        speechFramesCount = 0
+                        if (rms >= speechThresholdRms * 1.2f) {
+                            speechFramesCount++
+                            if (speechFramesCount >= 3) {
+                                speechFramesCount = 0
+                                onSpeechStarted()
+                            }
+                        } else {
+                            speechFramesCount = 0
+                        }
                     }
                 }
             }
@@ -111,6 +124,8 @@ class AudioCaptureManager(
             start()
         }
     }
+
+    var isContinuousMode: Boolean = false
 
     fun startStreaming() {
         silenceFramesCount = 0

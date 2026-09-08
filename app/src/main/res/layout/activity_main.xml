@@ -46,14 +46,19 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Connection Status Pill -->
+        <!-- Connection Status Pill (Clickable to reconnect) -->
         <LinearLayout
             android:id="@+id/statusPill"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_pill_status"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp">
 
             <View
                 android:id="@+id/statusDot"
@@ -70,6 +75,14 @@
                 android:text="@string/status_disconnected"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
+
+            <ImageView
+                android:id="@+id/ivReconnectStatus"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_refresh"
+                app:tint="@color/text_muted" />
         </LinearLayout>
 
         <!-- Settings Button -->
@@ -83,6 +96,64 @@
             android:src="@drawable/ic_settings" />
     </LinearLayout>
 
+    <!-- Disconnected Warning Banner (Prominent banner when offline) -->
+    <LinearLayout
+        android:id="@+id/layoutConnectionBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:visibility="visible"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_refresh"
+            app:tint="@color/primary" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvBannerTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Server Alveare Disconnesso"
+                android:textColor="@color/primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvBannerSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tocca per connetterti al server in LAN"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBannerConnect"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="0dp"
+            android:text="Connetti"
+            android:textColor="@color/on_primary"
+            android:textSize="12sp"
+            app:backgroundTint="@color/primary"
+            app:cornerRadius="18dp" />
+    </LinearLayout>
+
     <!-- Central Glowing Visualizer Orb -->
     <com.alveare.satellite.ui.VisualizerView
         android:id="@+id/visualizerView"
@@ -91,7 +162,7 @@
         android:layout_marginTop="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topBar" />
+        app:layout_constraintTop_toBottomOf="@id/layoutConnectionBanner" />
 
     <!-- Current State Label -->
     <TextView
@@ -107,7 +178,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/visualizerView" />
 
-    <!-- Badges Row (WakeWord / TTS Mode / Latency) -->
+    <!-- Badges Row (Listen Mode / TTS Mode / Latency) -->
     <LinearLayout
         android:id="@+id/badgesRow"
         android:layout_width="wrap_content"
@@ -120,11 +191,16 @@
         app:layout_constraintTop_toBottomOf="@id/tvStateLabel">
 
         <TextView
-            android:id="@+id/badgeWakeWord"
+            android:id="@+id/badgeListenMode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_pill_status"
-            android:text="👂 Wake Word: Ehi Alveare"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:text="🎙️ Sempre in ascolto"
             android:textColor="@color/secondary"
             android:textSize="11sp" />
 
@@ -134,6 +210,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_pill_status"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:text="🔊 TTS: Kokoro 24kHz"
             android:textColor="@color/primary"
             android:textSize="11sp" />
@@ -144,10 +222,43 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_pill_status"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:text="⚡ 0 ms"
             android:textColor="@color/text_muted"
             android:textSize="11sp"
             android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Live Microphone Level & Activity Bar -->
+    <LinearLayout
+        android:id="@+id/layoutMicLevel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        app:layout_constraintTop_toBottomOf="@id/badgesRow">
+
+        <TextView
+            android:id="@+id/tvMicLevelLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎙️ Mic: pronto"
+            android:textColor="@color/text_muted"
+            android:textSize="11sp" />
+
+        <ProgressBar
+            android:id="@+id/pbMicLevel"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="@color/secondary" />
     </LinearLayout>
 
     <!-- Live Conversation Transcript Cards -->
@@ -155,11 +266,11 @@
         android:id="@+id/scrollTranscript"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="8dp"
         android:layout_marginBottom="12dp"
         android:fillViewport="true"
         app:layout_constraintBottom_toTopOf="@id/bottomControls"
-        app:layout_constraintTop_toBottomOf="@id/badgesRow">
+        app:layout_constraintTop_toBottomOf="@id/layoutMicLevel">
 
         <LinearLayout
             android:layout_width="match_parent"

@@ -75,24 +75,25 @@ class VisualizerView @JvmOverloads constructor(
     }
 
     private fun drawIdleOrb(canvas: Canvas, cx: Float, cy: Float, radius: Float) {
-        val breathe = (sin(phase * 0.4) * 0.08 + 0.92).toFloat()
+        val micActivity = currentAmplitude.coerceIn(0f, 1f)
+        val breathe = (sin(phase * 0.4) * 0.05 + 0.95 + micActivity * 0.25).toFloat()
         val r = radius * breathe
 
-        // Outer glow
-        fillPaint.color = Color.parseColor("#153B82F6")
-        canvas.drawCircle(cx, cy, r * 1.35f, fillPaint)
+        // Outer glow reactive to ambient mic
+        fillPaint.color = Color.argb((25 + micActivity * 60).toInt().coerceIn(0, 255), 59, 130, 246)
+        canvas.drawCircle(cx, cy, r * (1.35f + micActivity * 0.2f), fillPaint)
 
         // Mid glow
-        fillPaint.color = Color.parseColor("#333B82F6")
+        fillPaint.color = Color.argb((50 + micActivity * 80).toInt().coerceIn(0, 255), 59, 130, 246)
         canvas.drawCircle(cx, cy, r * 1.15f, fillPaint)
 
         // Core
         fillPaint.color = Color.parseColor("#803B82F6")
         canvas.drawCircle(cx, cy, r, fillPaint)
 
-        // Ring
-        circlePaint.color = Color.parseColor("#FF3B82F6")
-        circlePaint.strokeWidth = 4f
+        // Ring - if mic is active, highlight ring
+        circlePaint.color = if (micActivity > 0.15f) Color.parseColor("#60A5FA") else Color.parseColor("#3B82F6")
+        circlePaint.strokeWidth = 4f + micActivity * 4f
         canvas.drawCircle(cx, cy, r, circlePaint)
     }
 

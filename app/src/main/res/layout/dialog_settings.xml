@@ -89,6 +89,47 @@
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
+        <!-- Test Connection & Reset URL Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTestConnection"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="🧪 Testa Connessione"
+                android:textColor="@color/primary"
+                android:textSize="12sp"
+                app:strokeColor="@color/primary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnResetDefaultUrl"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔄 IP Default"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Test Connection Feedback Result -->
+        <TextView
+            android:id="@+id/tvTestResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card"
+            android:padding="10dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
@@ -177,24 +218,48 @@
             android:layout_marginVertical="14dp"
             android:background="@color/surface_card_stroke" />
 
-        <!-- Wake Word & Audio Section -->
+        <!-- Listen Mode & Audio Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/settings_wake_word_section"
+            android:text="Modalità di Ascolto Satellite"
             android:textColor="@color/primary"
             android:textSize="14sp"
             android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgListenMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <RadioButton
+                android:id="@+id/rbListenContinuous"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="🎙️ Sempre in ascolto (Hands-free • Smart Speaker)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <RadioButton
+                android:id="@+id/rbListenPushToTalk"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="👆 Tocca per parlare (Push-to-Talk manuale)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+        </RadioGroup>
 
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switchWakeWord"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:checked="true"
-            android:text="@string/settings_wake_word_enable"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:checked="false"
+            android:text="👂 Wake Word 'Ehi Alveare' (sperimentale)"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
 
         <!-- Smart Display Mode Switch -->
         <com.google.android.material.switchmaterial.SwitchMaterial

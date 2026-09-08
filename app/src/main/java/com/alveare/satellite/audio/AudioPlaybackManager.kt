@@ -98,6 +98,13 @@ class AudioPlaybackManager(
                 pcmChunk[2] == 'F'.code.toByte() &&
                 pcmChunk[3] == 'F'.code.toByte()
             ) {
+                val wavRate = (pcmChunk[24].toInt() and 0xFF) or
+                        ((pcmChunk[25].toInt() and 0xFF) shl 8) or
+                        ((pcmChunk[26].toInt() and 0xFF) shl 16) or
+                        ((pcmChunk[27].toInt() and 0xFF) shl 24)
+                if (wavRate in 8000..96000 && wavRate != sampleRate) {
+                    setSampleRate(wavRate)
+                }
                 pcmChunk.copyOfRange(44, pcmChunk.size)
             } else {
                 pcmChunk
