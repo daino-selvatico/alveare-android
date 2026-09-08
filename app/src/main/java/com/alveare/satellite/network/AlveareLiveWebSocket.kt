@@ -189,6 +189,12 @@ class AlveareLiveWebSocket(
         }
     }
 
+    fun sendEndOfSpeech() {
+        if (isConnected.get()) {
+            webSocket?.send("""{"type":"end_of_speech"}""")
+        }
+    }
+
     fun sendConfig(contextTurns: Int) {
         if (isConnected.get()) {
             webSocket?.send("""{"type":"config","settings":{"max_context_turns":$contextTurns}}""")

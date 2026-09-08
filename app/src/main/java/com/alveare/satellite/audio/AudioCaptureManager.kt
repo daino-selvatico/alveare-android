@@ -40,7 +40,7 @@ class AudioCaptureManager(
 
         try {
             audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 sampleRate,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
@@ -48,8 +48,36 @@ class AudioCaptureManager(
             )
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize
+                )
+            }
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 isRecording.set(false)
                 return
+            }
+
+            try {
+                val sessionId = audioRecord?.audioSessionId ?: 0
+                if (sessionId > 0) {
+                    if (android.media.audiofx.AcousticEchoCanceler.isAvailable()) {
+                        android.media.audiofx.AcousticEchoCanceler.create(sessionId)?.apply {
+                            enabled = true
+                        }
+                    }
+                    if (android.media.audiofx.NoiseSuppressor.isAvailable()) {
+                        android.media.audiofx.NoiseSuppressor.create(sessionId)?.apply {
+                            enabled = true
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
             audioRecord?.startRecording()
@@ -113,15 +141,7 @@ class AudioCaptureManager(
                         }
                     } else {
                         silenceFramesCount = 0
-                        if (rms >= speechThresholdRms * 1.2f) {
-                            speechFramesCount++
-                            if (speechFramesCount >= 3) {
-                                speechFramesCount = 0
-                                onSpeechStarted()
-                            }
-                        } else {
-                            speechFramesCount = 0
-                        }
+                        speechFramesCount = 0
                     }
                 }
             }

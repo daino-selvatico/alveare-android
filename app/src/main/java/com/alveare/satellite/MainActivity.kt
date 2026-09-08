@@ -92,7 +92,34 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             showSettingsDialog()
         }
 
-        // 4. Push-To-Talk Mic Button
+        // 4. Push-To-Talk / Tap-to-Talk Mic Button
+        var touchDownTime = 0L
+        var isActionDown = false
+
+        binding.btnMic.setOnTouchListener { _, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    touchDownTime = System.currentTimeMillis()
+                    isActionDown = true
+                    false
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    val duration = System.currentTimeMillis() - touchDownTime
+                    if (isActionDown && duration >= 450) {
+                        isActionDown = false
+                        if (captureManager?.isStreamingAudio?.get() == true) {
+                            finishListeningAndProcess()
+                        }
+                        true
+                    } else {
+                        isActionDown = false
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+
         binding.btnMic.setOnClickListener {
             handleMicButtonClicked()
         }
@@ -178,19 +205,21 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         // 3. Wake Word Detector
         wakeWordDetector = WakeWordDetector {
             runOnUiThread {
-                if (!isAssistantSpeaking && captureManager?.isStreamingAudio?.get() != true) {
+                if (!isAssistantSpeaking && captureManager?.isStreamingAudio?.get() != true && prefs.isWakeWordEnabled && prefs.listenMode == AppPreferences.LISTEN_MODE_WAKE_WORD) {
                     startListeningSession(isWakeWordTriggered = true)
                 }
             }
         }.apply {
-            isEnabled.set(prefs.isWakeWordEnabled)
+            isEnabled.set(prefs.isWakeWordEnabled && prefs.listenMode == AppPreferences.LISTEN_MODE_WAKE_WORD)
         }
 
         // 4. Capture Manager (Mic)
         captureManager = AudioCaptureManager(
             sampleRate = 16000,
             onAudioChunkReady = { chunk ->
-                webSocket?.sendAudioChunk(chunk)
+                if (!isAssistantSpeaking && captureManager?.isMuted?.get() != true) {
+                    webSocket?.sendAudioChunk(chunk)
+                }
             },
             onAmplitudeChanged = { amp ->
                 runOnUiThread {
@@ -200,7 +229,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                     val progress = (amp * 100).toInt().coerceIn(0, 100)
                     binding.pbMicLevel.progress = progress
 
-                    if (amp > 0.12f) {
+                    if (isAssistantSpeaking) {
+                        binding.tvMicLevelLabel.text = "🔇 Mic in pausa (Alveare parla)"
+                        binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_muted))
+                    } else if (amp > 0.12f) {
                         binding.tvMicLevelLabel.text = "🎙️ Voce ($progress%)"
                         binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.secondary))
                     } else {
@@ -208,11 +240,13 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                         binding.tvMicLevelLabel.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_muted))
                     }
                 }
-                wakeWordDetector?.processAudioSample(amp)
+                if (prefs.isWakeWordEnabled && prefs.listenMode == AppPreferences.LISTEN_MODE_WAKE_WORD) {
+                    wakeWordDetector?.processAudioSample(amp)
+                }
             },
             onSilenceDetected = {
                 runOnUiThread {
-                    if (captureManager?.isStreamingAudio?.get() == true && prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
+                    if (captureManager?.isStreamingAudio?.get() == true && !isAssistantSpeaking && prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
                         finishListeningAndProcess()
                     }
                 }
@@ -301,6 +335,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun finishListeningAndProcess() {
         captureManager?.stopStreaming()
+        webSocket?.sendEndOfSpeech()
         SoundEffects.playProcessingChime()
 
         binding.visualizerView.setState(VisualizerView.State.PROCESSING)
@@ -451,25 +486,45 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 binding.badgeLatency.visibility = View.VISIBLE
                 binding.badgeLatency.text = "⚡ STT: ${latencyMs.toInt()} ms"
             }
+            currentAssistantText.clear()
+            binding.cardAssistant.visibility = View.VISIBLE
+            binding.tvAssistantText.text = "Sto pensando..."
+            binding.scrollTranscript.post {
+                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
+            }
         }
     }
 
     override fun onAssistantDelta(delta: String) {
         runOnUiThread {
+            val curr = currentAssistantText.toString()
+            if (curr == "Sto pensando..." || curr == "In ascolto...") {
+                currentAssistantText.clear()
+            }
             currentAssistantText.append(delta)
             binding.cardAssistant.visibility = View.VISIBLE
             binding.tvAssistantText.text = currentAssistantText.toString()
+            binding.scrollTranscript.post {
+                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
+            }
         }
     }
 
     override fun onAssistantSentence(sentence: String) {
         runOnUiThread {
+            val curr = currentAssistantText.toString()
+            if (curr == "Sto pensando..." || curr == "In ascolto...") {
+                currentAssistantText.clear()
+            }
             if (currentAssistantText.isNotEmpty() && !currentAssistantText.endsWith(" ")) {
                 currentAssistantText.append(" ")
             }
             currentAssistantText.append(sentence)
             binding.cardAssistant.visibility = View.VISIBLE
             binding.tvAssistantText.text = currentAssistantText.toString()
+            binding.scrollTranscript.post {
+                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
+            }
 
             // If Device Native TTS is active, synthesize on client!
             if (prefs.ttsMode == AppPreferences.MODE_DEVICE) {
@@ -499,17 +554,22 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 currentAssistantText.append(fullText)
                 binding.cardAssistant.visibility = View.VISIBLE
                 binding.tvAssistantText.text = fullText
+                binding.scrollTranscript.post {
+                    binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
+                }
             }
             binding.btnInterrupt.visibility = View.GONE
-            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
-                binding.visualizerView.setState(VisualizerView.State.IDLE)
-                binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
-                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
-            } else {
-                binding.visualizerView.setState(VisualizerView.State.IDLE)
-                binding.tvStateLabel.text = getString(R.string.status_ready)
-                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-                binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+            if (!isAssistantSpeaking) {
+                if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
+                    binding.visualizerView.setState(VisualizerView.State.IDLE)
+                    binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
+                    binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+                } else {
+                    binding.visualizerView.setState(VisualizerView.State.IDLE)
+                    binding.tvStateLabel.text = getString(R.string.status_ready)
+                    binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                    binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+                }
             }
         }
     }
