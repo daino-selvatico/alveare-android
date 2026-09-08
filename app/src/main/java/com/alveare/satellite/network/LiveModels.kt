@@ -8,6 +8,7 @@ data class LiveEvent(
     val text: String? = null,
     val delta: String? = null,
     val data: String? = null, // Base64 audio if present
+    @SerializedName("audio_b64") val audioB64: String? = null,
     val error: String? = null,
     @SerializedName("turn_id") val turnId: Int = 0,
     @SerializedName("sample_rate") val sampleRate: Int = 24000,

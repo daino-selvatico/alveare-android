@@ -113,12 +113,13 @@ class AlveareLiveWebSocket(
                 "assistant_delta" -> {
                     event.delta?.let { listener.onAssistantDelta(it) }
                 }
-                "assistant_sentence" -> {
+                "assistant_sentence", "llm_chunk" -> {
                     event.text?.let { listener.onAssistantSentence(it) }
                 }
                 "audio_chunk" -> {
-                    if (!event.data.isNullOrEmpty()) {
-                        val pcm = Base64.decode(event.data, Base64.DEFAULT)
+                    val rawB64 = event.audioB64 ?: event.data
+                    if (!rawB64.isNullOrEmpty()) {
+                        val pcm = Base64.decode(rawB64, Base64.DEFAULT)
                         listener.onAudioChunkReceived(pcm, event.sampleRate)
                     }
                 }

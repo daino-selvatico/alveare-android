@@ -91,7 +91,20 @@ class AudioPlaybackManager(
 
     fun enqueueAudio(pcmChunk: ByteArray) {
         if (pcmChunk.isNotEmpty()) {
-            audioQueue.offer(pcmChunk)
+            // If the audio chunk has a 44-byte WAV header (RIFF...WAVE), strip it for clean PCM streaming
+            val pcmData = if (pcmChunk.size > 44 &&
+                pcmChunk[0] == 'R'.code.toByte() &&
+                pcmChunk[1] == 'I'.code.toByte() &&
+                pcmChunk[2] == 'F'.code.toByte() &&
+                pcmChunk[3] == 'F'.code.toByte()
+            ) {
+                pcmChunk.copyOfRange(44, pcmChunk.size)
+            } else {
+                pcmChunk
+            }
+            if (pcmData.isNotEmpty()) {
+                audioQueue.offer(pcmData)
+            }
         }
     }
 
