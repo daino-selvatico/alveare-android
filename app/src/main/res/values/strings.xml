@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Alveare</string>
+    <string name="app_subtitle">Smart Home Neural Satellite</string>
+    
+    <!-- Status -->
+    <string name="status_disconnected">Disconnesso</string>
+    <string name="status_connecting">Connessione in corso...</string>
+    <string name="status_connected">Connesso ad Alveare</string>
+    <string name="status_ready">Pronto</string>
+    <string name="status_listening">In ascolto...</string>
+    <string name="status_processing">Elaborazione...</string>
+    <string name="status_speaking">Alveare parla...</string>
+    <string name="status_interrupted">Interrotto</string>
+    
+    <!-- Actions -->
+    <string name="action_tap_to_speak">Tocca per parlare</string>
+    <string name="action_listening">Ti ascolto... tocca per inviare</string>
+    <string name="action_interrupt">Interrompi</string>
+    <string name="action_settings">Impostazioni</string>
+    <string name="action_save">Salva impostazioni</string>
+    <string name="action_cancel">Annulla</string>
+    <string name="action_test_connection">Test Connessione</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Impostazioni Satellite</string>
+    <string name="settings_server_url">Indirizzo Server Alveare (WebSocket /ws/live)</string>
+    <string name="settings_server_url_hint">es. ws://192.168.50.1:8443/ws/live</string>
+    <string name="settings_trust_ssl">Ignora certificati SSL self-signed (WSS locale)</string>
+    <string name="settings_tts_section">Modalità Sintesi Vocale (TTS)</string>
+    <string name="settings_tts_server">Sintesi Lato Server (Kokoro-82M / Audio8 streaming)</string>
+    <string name="settings_tts_device">Sintesi Lato Dispositivo (Android Native TTS - Zero carico server)</string>
+    <string name="settings_tts_speech_rate">Velocità Voce Locale</string>
+    <string name="settings_tts_pitch">Intonazione (Pitch) Voce Locale</string>
+    <string name="settings_wake_word_section">Wake Word &amp; Ascolto</string>
+    <string name="settings_wake_word_enable">Attiva Wake Word (\"Ehi Alveare\")</string>
+    <string name="settings_wake_word_sensitivity">Sensibilità Microfono / VAD</string>
+    <string name="settings_smart_display">Modalità Smart Display (Schermo sempre attivo)</string>
+    <string name="settings_context_turns">Finestra Contesto (turni memorizzati)</string>
+    <string name="settings_max_tokens">Max Token Risposta (default 120)</string>
+</resources>
