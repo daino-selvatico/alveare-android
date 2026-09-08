@@ -18,6 +18,8 @@ data class LiveEvent(
     @SerializedName("e2e_latency_ms") val e2eLatencyMs: Float = 0f,
     @SerializedName("session_id") val sessionId: String? = null,
     @SerializedName("hardware_profile") val hardwareProfile: Map<String, Any>? = null,
+    @SerializedName("full_text") val fullText: String? = null,
+    @SerializedName("chunk_idx") val chunkIdx: Int = 0,
     @SerializedName("tool_name") val toolName: String? = null,
     @SerializedName("tool_args") val toolArgs: Any? = null
 )

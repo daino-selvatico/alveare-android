@@ -277,12 +277,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
 
         if (captureManager?.isStreamingAudio?.get() == true) {
-            if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
-                // If in continuous mode, clicking mic can trigger manual interrupt / flush
-                interruptSession()
-            } else {
-                finishListeningAndProcess()
-            }
+            finishListeningAndProcess()
         } else {
             startListeningSession(isWakeWordTriggered = false)
         }
@@ -299,13 +294,13 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         binding.btnInterrupt.visibility = View.VISIBLE
 
         currentAssistantText.clear()
+        binding.cardAssistant.visibility = View.VISIBLE
+        binding.tvAssistantText.text = "In ascolto..."
         binding.cardTool.visibility = View.GONE
     }
 
     private fun finishListeningAndProcess() {
-        if (prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
-            captureManager?.stopStreaming()
-        }
+        captureManager?.stopStreaming()
         SoundEffects.playProcessingChime()
 
         binding.visualizerView.setState(VisualizerView.State.PROCESSING)
@@ -320,9 +315,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
         playbackManager?.stopAndFlush()
         nativeTts?.stop()
-        if (prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
-            captureManager?.stopStreaming()
-        }
+        captureManager?.stopStreaming()
 
         setAssistantSpeakingState(false)
         binding.visualizerView.setState(VisualizerView.State.IDLE)
@@ -337,6 +330,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun setAssistantSpeakingState(speaking: Boolean) {
         isAssistantSpeaking = speaking
+        captureManager?.isMuted?.set(speaking)
         if (speaking) {
             binding.visualizerView.setState(VisualizerView.State.SPEAKING)
             binding.tvStateLabel.text = getString(R.string.status_speaking)
@@ -350,6 +344,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 getString(R.string.status_ready)
             binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
             binding.btnInterrupt.visibility = View.GONE
+            binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
         }
     }
 
@@ -389,8 +384,12 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
                 binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
             } else {
+                captureManager?.isContinuousMode = false
+                captureManager?.stopStreaming()
+                binding.visualizerView.setState(VisualizerView.State.IDLE)
                 binding.tvStateLabel.text = getString(R.string.status_ready)
                 binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
             }
         }
     }
@@ -465,6 +464,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     override fun onAssistantSentence(sentence: String) {
         runOnUiThread {
+            if (currentAssistantText.isNotEmpty() && !currentAssistantText.endsWith(" ")) {
+                currentAssistantText.append(" ")
+            }
+            currentAssistantText.append(sentence)
             binding.cardAssistant.visibility = View.VISIBLE
             binding.tvAssistantText.text = currentAssistantText.toString()
 
@@ -489,13 +492,24 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
     }
 
-    override fun onTurnCompleted(turnId: Int) {
+    override fun onTurnCompleted(turnId: Int, fullText: String?) {
         runOnUiThread {
+            if (!fullText.isNullOrBlank()) {
+                currentAssistantText.clear()
+                currentAssistantText.append(fullText)
+                binding.cardAssistant.visibility = View.VISIBLE
+                binding.tvAssistantText.text = fullText
+            }
             binding.btnInterrupt.visibility = View.GONE
             if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
                 binding.visualizerView.setState(VisualizerView.State.IDLE)
                 binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
                 binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
+            } else {
+                binding.visualizerView.setState(VisualizerView.State.IDLE)
+                binding.tvStateLabel.text = getString(R.string.status_ready)
+                binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
             }
         }
     }

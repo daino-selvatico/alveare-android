@@ -140,7 +140,7 @@ class AppPreferences(context: Context) {
         set(value) = prefs.edit().putFloat(KEY_WAKE_WORD_SENSITIVITY, value).apply()
 
     var listenMode: String
-        get() = prefs.getString(KEY_LISTEN_MODE, LISTEN_MODE_CONTINUOUS) ?: LISTEN_MODE_CONTINUOUS
+        get() = prefs.getString(KEY_LISTEN_MODE, LISTEN_MODE_PUSH_TO_TALK) ?: LISTEN_MODE_PUSH_TO_TALK
         set(value) = prefs.edit().putString(KEY_LISTEN_MODE, value).apply()
 
     var isSmartDisplayEnabled: Boolean

@@ -18,6 +18,7 @@ class AudioCaptureManager(
     private var audioRecord: AudioRecord? = null
     private val isRecording = AtomicBoolean(false)
     val isStreamingAudio = AtomicBoolean(false)
+    val isMuted = AtomicBoolean(false)
     private var captureThread: Thread? = null
 
     // Adaptive VAD parameters (tuned for natural mobile microphone distance)
@@ -75,6 +76,11 @@ class AudioCaptureManager(
                         val byteIdx = i * 2
                         byteBuffer[byteIdx] = (audioBuffer[i].toInt() and 0xFF).toByte()
                         byteBuffer[byteIdx + 1] = ((audioBuffer[i].toInt() shr 8) and 0xFF).toByte()
+                    }
+
+                    if (isMuted.get()) {
+                        onAmplitudeChanged(0.0f)
+                        continue
                     }
 
                     val rms = sqrt(sumSquare / readCount).toFloat()

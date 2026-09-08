@@ -31,7 +31,7 @@ class AlveareLiveWebSocket(
         fun onAssistantSentence(sentence: String)
         fun onAudioChunkReceived(pcmBytes: ByteArray, sampleRate: Int)
         fun onToolCall(toolName: String)
-        fun onTurnCompleted(turnId: Int)
+        fun onTurnCompleted(turnId: Int, fullText: String? = null)
         fun onInterrupted()
         fun onError(error: String)
     }
@@ -163,7 +163,7 @@ class AlveareLiveWebSocket(
                     listener.onToolCall(event.toolName ?: "Tool")
                 }
                 "turn_complete" -> {
-                    listener.onTurnCompleted(event.turnId)
+                    listener.onTurnCompleted(event.turnId, event.fullText)
                 }
                 "interrupted" -> {
                     listener.onInterrupted()

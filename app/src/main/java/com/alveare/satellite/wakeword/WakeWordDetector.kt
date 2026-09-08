@@ -24,7 +24,7 @@ class WakeWordDetector(
         if (!isConnectedProvider()) return // Never trigger if disconnected from Alveare!
 
         val now = System.currentTimeMillis()
-        if (now - lastTriggerTime < 3000) {
+        if (now - lastTriggerTime < 5000) {
             // Debounce after trigger
             return
         }
@@ -32,14 +32,14 @@ class WakeWordDetector(
         // Detect dynamic vocal rise with configurable sensitivity
         if (amplitude >= sensitivity) {
             val delta = now - lastBurstTime
-            if (delta in 150..800) {
+            if (delta in 180..650) {
                 energyBurstCount++
-                if (energyBurstCount >= 3) { // 3 distinct rhythmic syllables
+                if (energyBurstCount >= 4) { // 4 distinct rhythmic syllables
                     energyBurstCount = 0
                     lastTriggerTime = now
                     onWakeWordDetected()
                 }
-            } else if (delta > 900) {
+            } else if (delta > 750) {
                 energyBurstCount = 1
             }
             lastBurstTime = now

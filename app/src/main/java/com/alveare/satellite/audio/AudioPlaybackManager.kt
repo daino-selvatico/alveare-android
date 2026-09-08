@@ -66,14 +66,18 @@ class AudioPlaybackManager(
 
         playbackThread = Thread({
             audioTrack?.play()
+            var wasPlaying = false
             while (isRunning.get()) {
                 try {
-                    val chunk = audioQueue.take()
-                    if (chunk.isNotEmpty() && isRunning.get()) {
-                        onPlaybackStateChanged(true)
+                    val chunk = audioQueue.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (chunk != null && chunk.isNotEmpty() && isRunning.get()) {
+                        if (!wasPlaying) {
+                            wasPlaying = true
+                            onPlaybackStateChanged(true)
+                        }
                         audioTrack?.write(chunk, 0, chunk.size)
-                    }
-                    if (audioQueue.isEmpty()) {
+                    } else if (chunk == null && wasPlaying && audioQueue.isEmpty()) {
+                        wasPlaying = false
                         onPlaybackStateChanged(false)
                     }
                 } catch (e: InterruptedException) {
@@ -82,7 +86,9 @@ class AudioPlaybackManager(
                     e.printStackTrace()
                 }
             }
-            onPlaybackStateChanged(false)
+            if (wasPlaying) {
+                onPlaybackStateChanged(false)
+            }
         }, "Alveare-AudioPlaybackThread").apply {
             priority = Thread.MAX_PRIORITY
             start()
