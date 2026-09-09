@@ -4,7 +4,11 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -16,6 +20,10 @@ class AudioCaptureManager(
     private val onSilenceDetected: () -> Unit = {}
 ) {
     private var audioRecord: AudioRecord? = null
+    private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
+    private var agc: AutomaticGainControl? = null
+
     private val isRecording = AtomicBoolean(false)
     val isStreamingAudio = AtomicBoolean(false)
     val isMuted = AtomicBoolean(false)
@@ -26,6 +34,13 @@ class AudioCaptureManager(
     private var silenceFramesCount = 0
     var speechThresholdRms = 140.0f
     private val silenceFramesNeeded = 16 // ~320ms of silence at 20ms frames
+
+    private val mutedUntilMs = AtomicLong(0L)
+
+    fun muteFor(durationMs: Long) {
+        val target = System.currentTimeMillis() + durationMs
+        mutedUntilMs.set(maxOf(mutedUntilMs.get(), target))
+    }
 
     @SuppressLint("MissingPermission")
     fun start() {
@@ -39,6 +54,7 @@ class AudioCaptureManager(
         val bufferSize = max(minBufferSize * 2, 4096)
 
         try {
+            // Prefer VOICE_COMMUNICATION for hardware Acoustic Echo Cancellation (AEC) and VoIP pipeline
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 sampleRate,
@@ -46,6 +62,16 @@ class AudioCaptureManager(
                 AudioFormat.ENCODING_PCM_16BIT,
                 bufferSize
             )
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    bufferSize
+                )
+            }
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 audioRecord = AudioRecord(
@@ -62,16 +88,22 @@ class AudioCaptureManager(
                 return
             }
 
+            // Enable hardware audio effects if available on device
             try {
                 val sessionId = audioRecord?.audioSessionId ?: 0
                 if (sessionId > 0) {
-                    if (android.media.audiofx.AcousticEchoCanceler.isAvailable()) {
-                        android.media.audiofx.AcousticEchoCanceler.create(sessionId)?.apply {
+                    if (AcousticEchoCanceler.isAvailable()) {
+                        aec = AcousticEchoCanceler.create(sessionId)?.apply {
                             enabled = true
                         }
                     }
-                    if (android.media.audiofx.NoiseSuppressor.isAvailable()) {
-                        android.media.audiofx.NoiseSuppressor.create(sessionId)?.apply {
+                    if (NoiseSuppressor.isAvailable()) {
+                        ns = NoiseSuppressor.create(sessionId)?.apply {
+                            enabled = true
+                        }
+                    }
+                    if (AutomaticGainControl.isAvailable()) {
+                        agc = AutomaticGainControl.create(sessionId)?.apply {
                             enabled = true
                         }
                     }
@@ -94,6 +126,12 @@ class AudioCaptureManager(
             while (isRecording.get()) {
                 val readCount = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: -1
                 if (readCount > 0) {
+                    val now = System.currentTimeMillis()
+                    if (isMuted.get() || now < mutedUntilMs.get()) {
+                        onAmplitudeChanged(0.0f)
+                        continue
+                    }
+
                     // 1. Calculate RMS Amplitude
                     var sumSquare = 0.0
                     for (i in 0 until readCount) {
@@ -104,11 +142,6 @@ class AudioCaptureManager(
                         val byteIdx = i * 2
                         byteBuffer[byteIdx] = (audioBuffer[i].toInt() and 0xFF).toByte()
                         byteBuffer[byteIdx + 1] = ((audioBuffer[i].toInt() shr 8) and 0xFF).toByte()
-                    }
-
-                    if (isMuted.get()) {
-                        onAmplitudeChanged(0.0f)
-                        continue
                     }
 
                     val rms = sqrt(sumSquare / readCount).toFloat()
@@ -171,6 +204,12 @@ class AudioCaptureManager(
         captureThread?.interrupt()
         captureThread = null
         try {
+            aec?.release()
+            aec = null
+            ns?.release()
+            ns = null
+            agc?.release()
+            agc = null
             audioRecord?.stop()
             audioRecord?.release()
         } catch (ignored: Exception) {}

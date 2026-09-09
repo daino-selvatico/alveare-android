@@ -12,6 +12,7 @@ import kotlin.math.sin
 object SoundEffects {
     private const val SAMPLE_RATE = 24000
     private val scope = CoroutineScope(Dispatchers.Default)
+    private val isPlaying = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
      * Google Home / Alexa style ascending dual-tone chime (523Hz -> 659Hz)
@@ -20,8 +21,8 @@ object SoundEffects {
     fun playWakeChime() {
         scope.launch {
             playTones(
-                Tone(523.25, 0.08, 0.5), // C5
-                Tone(659.25, 0.12, 0.7)  // E5
+                Tone(523.25, 0.08, 0.25), // C5
+                Tone(659.25, 0.10, 0.30)  // E5
             )
         }
     }
@@ -32,8 +33,8 @@ object SoundEffects {
     fun playProcessingChime() {
         scope.launch {
             playTones(
-                Tone(659.25, 0.06, 0.4),
-                Tone(523.25, 0.08, 0.3)
+                Tone(659.25, 0.06, 0.20),
+                Tone(523.25, 0.08, 0.18)
             )
         }
     }
@@ -44,7 +45,7 @@ object SoundEffects {
     fun playInterruptChime() {
         scope.launch {
             playTones(
-                Tone(392.0, 0.05, 0.4) // G4
+                Tone(392.0, 0.05, 0.20) // G4
             )
         }
     }
@@ -52,6 +53,11 @@ object SoundEffects {
     private data class Tone(val freq: Double, val durationSec: Double, val maxVolume: Double)
 
     private fun playTones(vararg tones: Tone) {
+        if (!isPlaying.compareAndSet(false, true)) {
+            // Drop duplicate chime requests if already playing to prevent feedback pile-up
+            return
+        }
+        var audioTrack: AudioTrack? = null
         try {
             val totalSamples = tones.sumOf { (it.durationSec * SAMPLE_RATE).toInt() }
             val buffer = ShortArray(totalSamples)
@@ -70,7 +76,7 @@ object SoundEffects {
             }
 
             val bufferSize = buffer.size * 2
-            val audioTrack = AudioTrack.Builder()
+            audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -90,11 +96,21 @@ object SoundEffects {
 
             audioTrack.write(buffer, 0, buffer.size)
             audioTrack.play()
-            // Release when playback completes
-            Thread.sleep((tones.sumOf { it.durationSec } * 1000).toLong() + 50)
-            audioTrack.release()
+            // Wait for playback then stop and release cleanly
+            val sleepMs = (tones.sumOf { it.durationSec } * 1000).toLong() + 30
+            Thread.sleep(sleepMs)
+            try {
+                if (audioTrack.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                    audioTrack.stop()
+                }
+            } catch (ignored: Exception) {}
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            try {
+                audioTrack?.release()
+            } catch (ignored: Exception) {}
+            isPlaying.set(false)
         }
     }
 }

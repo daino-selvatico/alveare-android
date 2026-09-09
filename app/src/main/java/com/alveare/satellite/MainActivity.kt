@@ -318,6 +318,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     }
 
     private fun startListeningSession(isWakeWordTriggered: Boolean) {
+        captureManager?.muteFor(250)
         SoundEffects.playWakeChime()
         captureManager?.startStreaming()
 
@@ -335,6 +336,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun finishListeningAndProcess() {
         captureManager?.stopStreaming()
+        captureManager?.muteFor(300)
         webSocket?.sendEndOfSpeech()
         SoundEffects.playProcessingChime()
 
@@ -344,13 +346,19 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
     }
 
-    private fun interruptSession() {
-        SoundEffects.playInterruptChime()
-        webSocket?.sendInterrupt()
-
+    private fun interruptSession(sendToServer: Boolean = true) {
+        captureManager?.isMuted?.set(true)
+        captureManager?.muteFor(500)
         playbackManager?.stopAndFlush()
         nativeTts?.stop()
-        captureManager?.stopStreaming()
+        if (prefs.listenMode != AppPreferences.LISTEN_MODE_CONTINUOUS) {
+            captureManager?.stopStreaming()
+        }
+
+        if (sendToServer) {
+            webSocket?.sendInterrupt()
+            SoundEffects.playInterruptChime()
+        }
 
         setAssistantSpeakingState(false)
         binding.visualizerView.setState(VisualizerView.State.IDLE)
@@ -365,13 +373,15 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun setAssistantSpeakingState(speaking: Boolean) {
         isAssistantSpeaking = speaking
-        captureManager?.isMuted?.set(speaking)
         if (speaking) {
+            captureManager?.isMuted?.set(true)
             binding.visualizerView.setState(VisualizerView.State.SPEAKING)
             binding.tvStateLabel.text = getString(R.string.status_speaking)
             binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.accent_purple))
             binding.btnInterrupt.visibility = View.VISIBLE
         } else {
+            captureManager?.muteFor(500)
+            captureManager?.isMuted?.set(false)
             binding.visualizerView.setState(VisualizerView.State.IDLE)
             binding.tvStateLabel.text = if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
                 "Sempre in ascolto (parla liberamente)"
@@ -461,6 +471,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     override fun onVadSpeechEnd() {
         runOnUiThread {
             if (!isAssistantSpeaking) {
+                // Speech ended, assistant is about to process and respond!
+                // Mute microphone immediately to avoid picking up chimes or beginning of TTS
+                captureManager?.isMuted?.set(true)
+                captureManager?.muteFor(1000)
                 SoundEffects.playProcessingChime()
                 binding.visualizerView.setState(VisualizerView.State.PROCESSING)
                 binding.tvStateLabel.text = "Sto elaborando..."
@@ -480,6 +494,8 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     override fun onUserTranscript(text: String, latencyMs: Float) {
         runOnUiThread {
+            captureManager?.isMuted?.set(true)
+            captureManager?.muteFor(1000)
             binding.cardUser.visibility = View.VISIBLE
             binding.tvUserText.text = text
             if (latencyMs > 0) {
@@ -560,6 +576,8 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             }
             binding.btnInterrupt.visibility = View.GONE
             if (!isAssistantSpeaking) {
+                captureManager?.muteFor(500)
+                captureManager?.isMuted?.set(false)
                 if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
                     binding.visualizerView.setState(VisualizerView.State.IDLE)
                     binding.tvStateLabel.text = "Sempre in ascolto (parla liberamente)"
@@ -576,13 +594,16 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     override fun onInterrupted() {
         runOnUiThread {
-            interruptSession()
+            interruptSession(sendToServer = false)
         }
     }
 
     override fun onError(error: String) {
         runOnUiThread {
+            binding.badgeLatency.visibility = View.VISIBLE
+            binding.badgeLatency.text = "⚠️ $error"
             Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            setAssistantSpeakingState(false)
         }
     }
 

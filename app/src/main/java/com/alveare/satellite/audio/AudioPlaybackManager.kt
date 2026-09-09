@@ -59,26 +59,47 @@ class AudioPlaybackManager(
             .setBufferSizeInBytes(bufferSize)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
+        totalFramesWritten = 0
     }
+
+    @Volatile
+    private var totalFramesWritten: Long = 0
 
     fun start() {
         if (isRunning.getAndSet(true)) return
 
         playbackThread = Thread({
-            audioTrack?.play()
             var wasPlaying = false
             while (isRunning.get()) {
                 try {
-                    val chunk = audioQueue.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    val chunk = audioQueue.poll(150, java.util.concurrent.TimeUnit.MILLISECONDS)
                     if (chunk != null && chunk.isNotEmpty() && isRunning.get()) {
                         if (!wasPlaying) {
                             wasPlaying = true
+                            try {
+                                if (audioTrack?.playState != AudioTrack.PLAYSTATE_PLAYING) {
+                                    audioTrack?.play()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                             onPlaybackStateChanged(true)
                         }
                         audioTrack?.write(chunk, 0, chunk.size)
+                        totalFramesWritten += (chunk.size / 2)
                     } else if (chunk == null && wasPlaying && audioQueue.isEmpty()) {
-                        wasPlaying = false
-                        onPlaybackStateChanged(false)
+                        // Check if the physical speaker has finished playing the buffered frames
+                        val head = audioTrack?.playbackHeadPosition?.toLong() ?: 0L
+                        if (head >= totalFramesWritten) {
+                            wasPlaying = false
+                            try {
+                                audioTrack?.pause()
+                                audioTrack?.flush()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                            onPlaybackStateChanged(false)
+                        }
                     }
                 } catch (e: InterruptedException) {
                     break
@@ -86,6 +107,10 @@ class AudioPlaybackManager(
                     e.printStackTrace()
                 }
             }
+            try {
+                audioTrack?.pause()
+                audioTrack?.flush()
+            } catch (e: Exception) {}
             if (wasPlaying) {
                 onPlaybackStateChanged(false)
             }
@@ -124,10 +149,10 @@ class AudioPlaybackManager(
     @Synchronized
     fun stopAndFlush() {
         audioQueue.clear()
+        totalFramesWritten = 0
         try {
             audioTrack?.pause()
             audioTrack?.flush()
-            audioTrack?.play()
         } catch (ignored: Exception) {}
         onPlaybackStateChanged(false)
     }
