@@ -12,13 +12,16 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.alveare.satellite.audio.AudioCaptureManager
 import com.alveare.satellite.audio.AudioPlaybackManager
 import com.alveare.satellite.audio.SoundEffects
 import com.alveare.satellite.data.AppPreferences
+import com.alveare.satellite.data.ChatMessage
 import com.alveare.satellite.databinding.ActivityMainBinding
 import com.alveare.satellite.network.AlveareLiveWebSocket
 import com.alveare.satellite.tts.AndroidNativeTts
+import com.alveare.satellite.ui.ChatAdapter
 import com.alveare.satellite.ui.VisualizerView
 import com.alveare.satellite.wakeword.WakeWordDetector
 import com.google.android.material.button.MaterialButton
@@ -35,8 +38,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     private var wakeWordDetector: WakeWordDetector? = null
     private var webSocket: AlveareLiveWebSocket? = null
 
+    // Real-Time Chat Conversation History
+    private lateinit var chatAdapter: ChatAdapter
+
     private var isAssistantSpeaking = false
-    private var currentAssistantText = StringBuilder()
 
     companion object {
         private const val PERMISSION_REQ_RECORD_AUDIO = 101
@@ -67,9 +72,27 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     private fun initUi() {
         binding.tvRoomSubtitle.text = "${prefs.roomName} • Smart Satellite"
 
+        // 1. Setup Chat RecyclerView
+        chatAdapter = ChatAdapter()
+        val layoutManager = LinearLayoutManager(this).apply {
+            stackFromEnd = true
+        }
+        binding.rvChatHistory.layoutManager = layoutManager
+        binding.rvChatHistory.adapter = chatAdapter
+
+        // Load saved conversation history
+        val savedHistory = prefs.getConversationHistory()
+        if (savedHistory.isNotEmpty()) {
+            chatAdapter.setMessages(savedHistory)
+            binding.layoutEmptyChat.visibility = View.GONE
+            binding.rvChatHistory.scrollToPosition(savedHistory.size - 1)
+        } else {
+            binding.layoutEmptyChat.visibility = View.VISIBLE
+        }
+
         updateBadges()
 
-        // 1. Connection Triggers (Click on Pill or Banner to connect/reconnect)
+        // 2. Connection Triggers (Click on Pill or Banner to connect/reconnect)
         binding.statusPill.setOnClickListener {
             connectWebSocket()
         }
@@ -82,17 +105,22 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             connectWebSocket()
         }
 
-        // 2. Listen Mode Quick Toggle (Tap badge to switch between Continuous and Push-to-Talk)
+        // 3. Clear Memory / Delete Chat Button
+        binding.btnClearMemory.setOnClickListener {
+            showClearMemoryDialog()
+        }
+
+        // 4. Listen Mode Quick Toggle (Tap badge to switch between Continuous and Push-to-Talk)
         binding.badgeListenMode.setOnClickListener {
             toggleListenMode()
         }
 
-        // 3. Settings Button
+        // 5. Settings Button
         binding.btnSettings.setOnClickListener {
             showSettingsDialog()
         }
 
-        // 4. Push-To-Talk / Tap-to-Talk Mic Button
+        // 6. Push-To-Talk / Tap-to-Talk Mic Button
         var touchDownTime = 0L
         var isActionDown = false
 
@@ -124,10 +152,25 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             handleMicButtonClicked()
         }
 
-        // 5. Interrupt Button
+        // 7. Interrupt Button
         binding.btnInterrupt.setOnClickListener {
             interruptSession()
         }
+    }
+
+    private fun showClearMemoryDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Cancella Memoria")
+            .setMessage("Vuoi azzerare la memoria della conversazione e cancellare la cronologia dei messaggi?")
+            .setPositiveButton("Azzera") { _, _ ->
+                webSocket?.sendClearMemory()
+                chatAdapter.clearMessages()
+                prefs.clearConversationHistory()
+                binding.layoutEmptyChat.visibility = View.VISIBLE
+                Toast.makeText(this, "Memoria conversazione azzerata.", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Annulla", null)
+            .show()
     }
 
     private fun toggleListenMode() {
@@ -225,7 +268,6 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 runOnUiThread {
                     binding.visualizerView.setAmplitude(amp)
 
-                    // Real-time Mic Level Feedback Bar (VU meter)
                     val progress = (amp * 100).toInt().coerceIn(0, 100)
                     binding.pbMicLevel.progress = progress
 
@@ -327,11 +369,6 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
         binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.secondary)
         binding.btnInterrupt.visibility = View.VISIBLE
-
-        currentAssistantText.clear()
-        binding.cardAssistant.visibility = View.VISIBLE
-        binding.tvAssistantText.text = "In ascolto..."
-        binding.cardTool.visibility = View.GONE
     }
 
     private fun finishListeningAndProcess() {
@@ -359,6 +396,8 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             webSocket?.sendInterrupt()
             SoundEffects.playInterruptChime()
         }
+
+        chatAdapter.finalizeAssistant(null)
 
         setAssistantSpeakingState(false)
         binding.visualizerView.setState(VisualizerView.State.IDLE)
@@ -397,6 +436,13 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         runOnUiThread {
             binding.tvConnectionStatus.text = text
             binding.statusDot.backgroundTintList = ColorStateList.valueOf(color)
+        }
+    }
+
+    private fun scrollToBottom() {
+        val count = chatAdapter.itemCount
+        if (count > 0) {
+            binding.rvChatHistory.smoothScrollToPosition(count - 1)
         }
     }
 
@@ -462,8 +508,6 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 binding.tvStateLabel.text = "In ascolto... (parla ora)"
                 binding.tvStateLabel.setTextColor(ContextCompat.getColor(this, R.color.secondary))
                 binding.btnInterrupt.visibility = View.VISIBLE
-                currentAssistantText.clear()
-                binding.cardTool.visibility = View.GONE
             }
         }
     }
@@ -471,8 +515,6 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
     override fun onVadSpeechEnd() {
         runOnUiThread {
             if (!isAssistantSpeaking) {
-                // Speech ended, assistant is about to process and respond!
-                // Mute microphone immediately to avoid picking up chimes or beginning of TTS
                 captureManager?.isMuted?.set(true)
                 captureManager?.muteFor(1000)
                 SoundEffects.playProcessingChime()
@@ -496,51 +538,48 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         runOnUiThread {
             captureManager?.isMuted?.set(true)
             captureManager?.muteFor(1000)
-            binding.cardUser.visibility = View.VISIBLE
-            binding.tvUserText.text = text
+
+            binding.layoutEmptyChat.visibility = View.GONE
+
+            // 1. Add User Message to Chat History
+            chatAdapter.addMessage(
+                ChatMessage(
+                    sender = "user",
+                    text = text,
+                    latencyMs = latencyMs
+                )
+            )
+
+            // 2. Add Streaming Assistant Placeholder
+            chatAdapter.addMessage(
+                ChatMessage(
+                    sender = "assistant",
+                    text = "Sto pensando...",
+                    isStreaming = true
+                )
+            )
+
             if (latencyMs > 0) {
                 binding.badgeLatency.visibility = View.VISIBLE
                 binding.badgeLatency.text = "⚡ STT: ${latencyMs.toInt()} ms"
             }
-            currentAssistantText.clear()
-            binding.cardAssistant.visibility = View.VISIBLE
-            binding.tvAssistantText.text = "Sto pensando..."
-            binding.scrollTranscript.post {
-                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
-            }
+
+            scrollToBottom()
         }
     }
 
     override fun onAssistantDelta(delta: String) {
         runOnUiThread {
-            val curr = currentAssistantText.toString()
-            if (curr == "Sto pensando..." || curr == "In ascolto...") {
-                currentAssistantText.clear()
-            }
-            currentAssistantText.append(delta)
-            binding.cardAssistant.visibility = View.VISIBLE
-            binding.tvAssistantText.text = currentAssistantText.toString()
-            binding.scrollTranscript.post {
-                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
-            }
+            binding.layoutEmptyChat.visibility = View.GONE
+            chatAdapter.appendAssistantDelta(delta)
+            scrollToBottom()
         }
     }
 
     override fun onAssistantSentence(sentence: String) {
         runOnUiThread {
-            val curr = currentAssistantText.toString()
-            if (curr == "Sto pensando..." || curr == "In ascolto...") {
-                currentAssistantText.clear()
-            }
-            if (currentAssistantText.isNotEmpty() && !currentAssistantText.endsWith(" ")) {
-                currentAssistantText.append(" ")
-            }
-            currentAssistantText.append(sentence)
-            binding.cardAssistant.visibility = View.VISIBLE
-            binding.tvAssistantText.text = currentAssistantText.toString()
-            binding.scrollTranscript.post {
-                binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
-            }
+            binding.layoutEmptyChat.visibility = View.GONE
+            scrollToBottom()
 
             // If Device Native TTS is active, synthesize on client!
             if (prefs.ttsMode == AppPreferences.MODE_DEVICE) {
@@ -556,24 +595,20 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
     }
 
-    override fun onToolCall(toolName: String) {
+    override fun onToolCall(toolName: String, args: String?, summary: String?, status: String?) {
         runOnUiThread {
-            binding.cardTool.visibility = View.VISIBLE
-            binding.tvToolText.text = "⚡ Esecuzione: $toolName"
+            binding.layoutEmptyChat.visibility = View.GONE
+            chatAdapter.updateOrAddToolCall(toolName, args, summary, status)
+            scrollToBottom()
         }
     }
 
     override fun onTurnCompleted(turnId: Int, fullText: String?) {
         runOnUiThread {
-            if (!fullText.isNullOrBlank()) {
-                currentAssistantText.clear()
-                currentAssistantText.append(fullText)
-                binding.cardAssistant.visibility = View.VISIBLE
-                binding.tvAssistantText.text = fullText
-                binding.scrollTranscript.post {
-                    binding.scrollTranscript.fullScroll(View.FOCUS_DOWN)
-                }
-            }
+            chatAdapter.finalizeAssistant(fullText)
+            prefs.saveConversationHistory(chatAdapter.getMessages())
+            scrollToBottom()
+
             binding.btnInterrupt.visibility = View.GONE
             if (!isAssistantSpeaking) {
                 captureManager?.muteFor(500)
@@ -589,6 +624,15 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                     binding.btnMic.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
                 }
             }
+        }
+    }
+
+    override fun onMemoryCleared(message: String) {
+        runOnUiThread {
+            chatAdapter.clearMessages()
+            prefs.clearConversationHistory()
+            binding.layoutEmptyChat.visibility = View.VISIBLE
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -649,23 +693,26 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
         // Test Connection Button
         btnTestConnection.setOnClickListener {
-            val testUrl = etServerUrl.text.toString().trim()
+            val urlToCheck = etServerUrl.text.toString().trim()
             tvTestResult.visibility = View.VISIBLE
-            tvTestResult.text = "⏳ Test connessione in corso verso $testUrl..."
-            tvTestResult.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+            tvTestResult.text = "Verifica connessione in corso..."
+            tvTestResult.setTextColor(Color.parseColor("#F59E0B"))
 
-            AlveareLiveWebSocket.testServerStatus(testUrl, switchTrustSsl.isChecked) { success, msg ->
+            Thread {
+                val result = testServerHttpReachable(urlToCheck, switchTrustSsl.isChecked)
                 runOnUiThread {
-                    tvTestResult.text = msg
-                    tvTestResult.setTextColor(
-                        if (success) ContextCompat.getColor(this, R.color.secondary)
-                        else ContextCompat.getColor(this, R.color.accent_red)
-                    )
+                    if (result.first) {
+                        tvTestResult.text = "✓ Connesso ad Alveare (${result.second})\n${result.third}"
+                        tvTestResult.setTextColor(Color.parseColor("#10B981"))
+                    } else {
+                        tvTestResult.text = "✗ Connessione fallita: ${result.second}"
+                        tvTestResult.setTextColor(Color.parseColor("#EF4444"))
+                    }
                 }
-            }
+            }.start()
         }
 
-        // Reset to Default URL Button
+        // Reset to default LAN URL
         btnResetDefaultUrl.setOnClickListener {
             etServerUrl.setText(AppPreferences.DEFAULT_SERVER_URL)
         }
@@ -680,8 +727,34 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         }
 
         rgTtsMode.setOnCheckedChangeListener { _, checkedId ->
-            layoutDeviceTtsSettings.visibility = if (checkedId == R.id.rbTtsDevice) View.VISIBLE else View.GONE
+            if (checkedId == R.id.rbTtsDevice) {
+                layoutDeviceTtsSettings.visibility = View.VISIBLE
+            } else {
+                layoutDeviceTtsSettings.visibility = View.GONE
+            }
         }
+
+        seekSpeechRate.progress = ((prefs.speechRate - 0.5f) / 1.5f * 100).toInt().coerceIn(0, 100)
+        tvSpeechRateLabel.text = "Velocità Voce: ${String.format("%.1fx", prefs.speechRate)}"
+        seekSpeechRate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val rate = 0.5f + (progress / 100f) * 1.5f
+                tvSpeechRateLabel.text = "Velocità Voce: ${String.format("%.1fx", rate)}"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        seekPitch.progress = ((prefs.pitch - 0.5f) / 1.5f * 100).toInt().coerceIn(0, 100)
+        tvPitchLabel.text = "Intonazione (Pitch): ${String.format("%.1fx", prefs.pitch)}"
+        seekPitch.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val pitch = 0.5f + (progress / 100f) * 1.5f
+                tvPitchLabel.text = "Intonazione (Pitch): ${String.format("%.1fx", pitch)}"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         // Listen Mode
         if (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS) {
@@ -690,80 +763,107 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             rbListenPushToTalk.isChecked = true
         }
 
-        seekSpeechRate.progress = ((prefs.speechRate - 0.5f) * 10f).toInt().coerceIn(0, 20)
-        tvSpeechRateLabel.text = "Velocità Voce Locale: ${String.format("%.1f", prefs.speechRate)}x"
-        seekSpeechRate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val rate = 0.5f + (progress / 10f)
-                tvSpeechRateLabel.text = "Velocità Voce Locale: ${String.format("%.1f", rate)}x"
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        seekPitch.progress = ((prefs.pitch - 0.5f) * 10f).toInt().coerceIn(0, 20)
-        tvPitchLabel.text = "Intonazione (Pitch): ${String.format("%.1f", prefs.pitch)}x"
-        seekPitch.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                val pitch = 0.5f + (progress / 10f)
-                tvPitchLabel.text = "Intonazione (Pitch): ${String.format("%.1f", pitch)}x"
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
         switchWakeWord.isChecked = prefs.isWakeWordEnabled
         switchKeepScreenOn.isChecked = prefs.isSmartDisplayEnabled
 
-        seekContextTurns.progress = prefs.contextTurns - 2
-        tvContextTurnsLabel.text = "Finestra Contesto: ${prefs.contextTurns} turni memorizzati"
+        // Context Turns Slider
+        seekContextTurns.progress = prefs.contextTurns
+        tvContextTurnsLabel.text = "Memoria Conversazione: ${prefs.contextTurns} turni"
         seekContextTurns.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                tvContextTurnsLabel.text = "Finestra Contesto: ${progress + 2} turni memorizzati"
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val turns = progress.coerceAtLeast(2)
+                tvContextTurnsLabel.text = "Memoria Conversazione: $turns turni"
             }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
-
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
 
         btnSave.setOnClickListener {
             prefs.roomName = etRoomName.text.toString().trim()
             prefs.serverUrl = etServerUrl.text.toString().trim()
             prefs.trustSelfSignedSsl = switchTrustSsl.isChecked
+
             prefs.ttsMode = if (rbTtsServer.isChecked) AppPreferences.MODE_SERVER else AppPreferences.MODE_DEVICE
+            prefs.speechRate = 0.5f + (seekSpeechRate.progress / 100f) * 1.5f
+            prefs.pitch = 0.5f + (seekPitch.progress / 100f) * 1.5f
+            nativeTts?.setSpeechRate(prefs.speechRate)
+            nativeTts?.setPitch(prefs.pitch)
+
             prefs.listenMode = if (rbListenContinuous.isChecked) AppPreferences.LISTEN_MODE_CONTINUOUS else AppPreferences.LISTEN_MODE_PUSH_TO_TALK
-            prefs.speechRate = 0.5f + (seekSpeechRate.progress / 10f)
-            prefs.pitch = 0.5f + (seekPitch.progress / 10f)
+            captureManager?.isContinuousMode = (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
+
             prefs.isWakeWordEnabled = switchWakeWord.isChecked
+            wakeWordDetector?.isEnabled?.set(prefs.isWakeWordEnabled && prefs.listenMode == AppPreferences.LISTEN_MODE_WAKE_WORD)
+
             prefs.isSmartDisplayEnabled = switchKeepScreenOn.isChecked
-            prefs.contextTurns = seekContextTurns.progress + 2
+            applySmartDisplayMode()
+
+            prefs.contextTurns = seekContextTurns.progress.coerceAtLeast(2)
 
             binding.tvRoomSubtitle.text = "${prefs.roomName} • Smart Satellite"
             updateBadges()
-            applySmartDisplayMode()
 
-            wakeWordDetector?.isEnabled?.set(prefs.isWakeWordEnabled)
-            nativeTts?.setSpeechRate(prefs.speechRate)
-            nativeTts?.setPitch(prefs.pitch)
-            captureManager?.isContinuousMode = (prefs.listenMode == AppPreferences.LISTEN_MODE_CONTINUOUS)
-
-            // Always reconnect with new or confirmed settings
             connectWebSocket()
+            dialog.dismiss()
+        }
 
+        btnCancel.setOnClickListener {
             dialog.dismiss()
         }
 
         dialog.show()
     }
 
+    private fun testServerHttpReachable(wsUrl: String, trustSsl: Boolean): Triple<Boolean, String, String> {
+        val httpUrl = wsUrl
+            .replace("wss://", "https://")
+            .replace("ws://", "http://")
+            .replace("/ws/live", "/api/status")
+
+        val startTime = System.currentTimeMillis()
+        return try {
+            val clientBuilder = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+
+            if (trustSsl && httpUrl.startsWith("https://")) {
+                val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                    override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                })
+                val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+                sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+                clientBuilder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+                clientBuilder.hostnameVerifier { _, _ -> true }
+            }
+
+            val request = okhttp3.Request.Builder().url(httpUrl).get().build()
+            val response = clientBuilder.build().newCall(request).execute()
+            val latency = System.currentTimeMillis() - startTime
+
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: ""
+                val modelsSummary = if (body.contains("\"slots\"")) {
+                    "Modelli attivi rilevati (Gemma 4 / Kokoro / Whisper)"
+                } else {
+                    "Endpoint API attivo"
+                }
+                Triple(true, "${latency}ms", modelsSummary)
+            } else {
+                Triple(false, "HTTP ${response.code}", "")
+            }
+        } catch (e: Exception) {
+            Triple(false, "${e.javaClass.simpleName}: ${e.message}", "")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        captureManager?.release()
-        playbackManager?.release()
-        nativeTts?.shutdown()
         webSocket?.disconnect()
+        captureManager?.release()
+        playbackManager?.stopAndFlush()
+        nativeTts?.shutdown()
+        wakeWordDetector?.reset()
     }
 }

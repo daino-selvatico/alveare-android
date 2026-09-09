@@ -30,8 +30,9 @@ class AlveareLiveWebSocket(
         fun onAssistantDelta(delta: String)
         fun onAssistantSentence(sentence: String)
         fun onAudioChunkReceived(pcmBytes: ByteArray, sampleRate: Int)
-        fun onToolCall(toolName: String)
+        fun onToolCall(toolName: String, args: String?, summary: String?, status: String?)
         fun onTurnCompleted(turnId: Int, fullText: String? = null)
+        fun onMemoryCleared(message: String)
         fun onInterrupted()
         fun onError(error: String)
     }
@@ -159,11 +160,20 @@ class AlveareLiveWebSocket(
                         listener.onAudioChunkReceived(pcm, event.sampleRate)
                     }
                 }
-                "tool_call" -> {
-                    listener.onToolCall(event.toolName ?: "Tool")
+                "tool_call", "tool_call_start" -> {
+                    val argsStr = event.arguments?.toString() ?: event.toolArgs?.toString()
+                    listener.onToolCall(
+                        event.toolName ?: "tool",
+                        argsStr,
+                        event.resultSummary,
+                        event.status ?: "running"
+                    )
                 }
                 "turn_complete" -> {
                     listener.onTurnCompleted(event.turnId, event.fullText)
+                }
+                "memory_cleared" -> {
+                    listener.onMemoryCleared(event.message ?: "Memoria conversazione azzerata.")
                 }
                 "interrupted" -> {
                     listener.onInterrupted()
@@ -198,6 +208,12 @@ class AlveareLiveWebSocket(
     fun sendConfig(contextTurns: Int) {
         if (isConnected.get()) {
             webSocket?.send("""{"type":"config","settings":{"max_context_turns":$contextTurns}}""")
+        }
+    }
+
+    fun sendClearMemory() {
+        if (isConnected.get()) {
+            webSocket?.send("""{"type":"clear_memory"}""")
         }
     }
 

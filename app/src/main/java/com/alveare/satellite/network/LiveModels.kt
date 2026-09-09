@@ -21,5 +21,9 @@ data class LiveEvent(
     @SerializedName("full_text") val fullText: String? = null,
     @SerializedName("chunk_idx") val chunkIdx: Int = 0,
     @SerializedName("tool_name") val toolName: String? = null,
-    @SerializedName("tool_args") val toolArgs: Any? = null
+    @SerializedName("tool_args") val toolArgs: Any? = null,
+    @SerializedName("arguments") val arguments: Any? = null,
+    @SerializedName("result_summary") val resultSummary: String? = null,
+    val status: String? = null,
+    val message: String? = null
 )

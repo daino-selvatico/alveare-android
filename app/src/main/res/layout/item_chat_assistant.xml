@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="start"
+    android:orientation="vertical"
+    android:paddingStart="4dp"
+    android:paddingEnd="48dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bubble_assistant"
+        android:orientation="vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvAssistantSender"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Alveare Live"
+                android:textColor="@color/secondary"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/pbStreaming"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="6dp"
+                android:indeterminateTint="@color/secondary"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvAssistantText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            tools:text="A Firenze oggi ci sono 24 gradi con cielo parzialmente nuvoloso." />
+
+        <TextView
+            android:id="@+id/tvAssistantMeta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start"
+            android:layout_marginTop="3dp"
+            android:textColor="@color/text_muted"
+            android:textSize="10sp"
+            tools:text="19:30" />
+    </LinearLayout>
+</LinearLayout>

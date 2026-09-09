@@ -19,6 +19,7 @@ class AppPreferences(context: Context) {
         const val KEY_LISTEN_MODE = "listen_mode"
         const val KEY_SMART_DISPLAY = "smart_display"
         const val KEY_CONTEXT_TURNS = "context_turns"
+        const val KEY_CHAT_HISTORY = "chat_history_json"
 
         const val DEFAULT_SERVER_URL = "wss://192.168.132.197:8443/ws/live"
         const val DEFAULT_ROOM_NAME = "Salotto"
@@ -150,4 +151,29 @@ class AppPreferences(context: Context) {
     var contextTurns: Int
         get() = prefs.getInt(KEY_CONTEXT_TURNS, 6)
         set(value) = prefs.edit().putInt(KEY_CONTEXT_TURNS, value).apply()
+
+    fun getConversationHistory(): MutableList<ChatMessage> {
+        val jsonStr = prefs.getString(KEY_CHAT_HISTORY, null) ?: return mutableListOf()
+        return try {
+            val type = object : com.google.gson.reflect.TypeToken<MutableList<ChatMessage>>() {}.type
+            com.google.gson.Gson().fromJson(jsonStr, type) ?: mutableListOf()
+        } catch (e: Exception) {
+            mutableListOf()
+        }
+    }
+
+    fun saveConversationHistory(messages: List<ChatMessage>) {
+        try {
+            // Keep at most 50 messages to prevent excessive SharedPreferences size
+            val trimmed = if (messages.size > 50) messages.takeLast(50) else messages
+            val jsonStr = com.google.gson.Gson().toJson(trimmed)
+            prefs.edit().putString(KEY_CHAT_HISTORY, jsonStr).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun clearConversationHistory() {
+        prefs.edit().remove(KEY_CHAT_HISTORY).apply()
+    }
 }
