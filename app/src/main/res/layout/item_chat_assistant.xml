@@ -18,6 +18,7 @@
         android:paddingHorizontal="14dp"
         android:paddingVertical="10dp">
 
+        <!-- Header row with sender, streaming indicator, and metrics -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -41,13 +42,44 @@
                 android:layout_marginStart="6dp"
                 android:indeterminateTint="@color/secondary"
                 android:visibility="gone" />
+
+            <!-- TTFT / TTFA Latency Badge -->
+            <TextView
+                android:id="@+id/badgeAssistantLatency"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_pill_status"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textColor="@color/primary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="⚡ TTFT: 120ms • TTFA: 350ms"
+                tools:visibility="visible" />
+
+            <!-- Playback Status Badge -->
+            <TextView
+                android:id="@+id/badgePlayback"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_pill_status"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textColor="@color/accent_purple"
+                android:textSize="10sp"
+                android:visibility="gone"
+                tools:text="🔊 In riproduzione"
+                tools:visibility="visible" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/tvAssistantText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:textColor="@color/text_primary"
             android:textSize="14sp"
             tools:text="A Firenze oggi ci sono 24 gradi con cielo parzialmente nuvoloso." />

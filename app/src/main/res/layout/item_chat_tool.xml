@@ -25,7 +25,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🔍"
-                android:textSize="14sp" />
+                android:textSize="15sp" />
 
             <TextView
                 android:id="@+id/tvToolHeader"
@@ -34,31 +34,44 @@
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:textColor="@color/accent_blue"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                tools:text="Ricerca Web: meteo firenze" />
+                tools:text="Ricerca Web: &quot;meteo a Firenze&quot;" />
+
+            <ProgressBar
+                android:id="@+id/pbToolProgress"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="6dp"
+                android:indeterminateTint="@color/accent_blue"
+                android:visibility="gone"
+                tools:visibility="visible" />
 
             <TextView
                 android:id="@+id/tvToolStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_pill_status"
-                android:paddingHorizontal="6dp"
-                android:paddingVertical="2dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
                 android:textColor="@color/secondary"
-                android:textSize="10sp"
-                tools:text="✓ Completato" />
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="✓ Risultati trovati" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/tvToolSummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
+            android:background="#151E32"
+            android:padding="8dp"
             android:ellipsize="end"
-            android:maxLines="3"
+            android:maxLines="4"
             android:textColor="@color/text_secondary"
             android:textSize="12sp"
-            tools:text="Risultati DuckDuckGo: A Firenze oggi cielo sereno con 24°C..." />
+            tools:text="Risultati DuckDuckGo: A Firenze oggi cielo sereno con 24°C, venti moderati da ovest..." />
     </LinearLayout>
 </LinearLayout>

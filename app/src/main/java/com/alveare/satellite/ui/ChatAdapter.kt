@@ -82,42 +82,62 @@ class ChatAdapter(
             return
         }
 
-        val last = messages.last()
-        if (last.sender == "assistant" && last.isStreaming) {
+        val lastIndex = messages.indexOfLast { it.sender == "assistant" }
+        if (lastIndex != -1 && messages[lastIndex].isStreaming) {
+            val last = messages[lastIndex]
             if (last.text == "Sto pensando..." || last.text == "In ascolto...") {
                 last.text = delta
             } else {
                 last.text += delta
             }
-            notifyItemChanged(messages.size - 1)
+            notifyItemChanged(lastIndex)
         } else {
             addMessage(ChatMessage(sender = "assistant", text = delta, isStreaming = true))
         }
     }
 
+    fun updateAssistantMetrics(ttftMs: Float = 0f, ttfaMs: Float = 0f) {
+        val lastIndex = messages.indexOfLast { it.sender == "assistant" }
+        if (lastIndex != -1) {
+            val last = messages[lastIndex]
+            if (ttftMs > 0) last.ttftMs = ttftMs
+            if (ttfaMs > 0) last.ttfaMs = ttfaMs
+            notifyItemChanged(lastIndex)
+        }
+    }
+
+    fun setAssistantPlaying(isPlaying: Boolean) {
+        val lastIndex = messages.indexOfLast { it.sender == "assistant" }
+        if (lastIndex != -1) {
+            val last = messages[lastIndex]
+            if (last.isPlaying != isPlaying) {
+                last.isPlaying = isPlaying
+                notifyItemChanged(lastIndex)
+            }
+        }
+    }
+
     fun finalizeAssistant(fullText: String?) {
-        if (messages.isEmpty()) return
-        val last = messages.last()
-        if (last.sender == "assistant") {
+        val lastIndex = messages.indexOfLast { it.sender == "assistant" }
+        if (lastIndex != -1) {
+            val last = messages[lastIndex]
             last.isStreaming = false
             if (!fullText.isNullOrBlank()) {
                 last.text = fullText
             }
-            notifyItemChanged(messages.size - 1)
+            notifyItemChanged(lastIndex)
         }
     }
 
     fun updateOrAddToolCall(toolName: String, args: String?, summary: String?, status: String?) {
-        // Find existing tool item with matching toolName if running
-        val existingIndex = messages.indexOfLast { it.sender == "tool" && it.toolName == toolName && it.toolStatus == "running" }
+        val existingIndex = messages.indexOfLast { it.sender == "tool" && it.toolName == toolName && (it.toolStatus == "running" || it.toolStatus == null) }
         if (existingIndex != -1) {
             val item = messages[existingIndex]
-            item.toolStatus = status ?: "success"
+            item.toolStatus = status ?: "ok"
             if (!summary.isNullOrBlank()) item.toolSummary = summary
             if (!args.isNullOrBlank()) item.toolArgs = args
             notifyItemChanged(existingIndex)
         } else {
-            // New tool call card
             val item = ChatMessage(
                 sender = "tool",
                 text = "Tool Call",
@@ -142,16 +162,19 @@ class ChatAdapter(
         private val tvSender: TextView = itemView.findViewById(R.id.tvUserSender)
         private val tvText: TextView = itemView.findViewById(R.id.tvUserText)
         private val tvMeta: TextView = itemView.findViewById(R.id.tvUserMeta)
+        private val badgeStt: TextView = itemView.findViewById(R.id.badgeSttLatency)
 
         fun bind(item: ChatMessage) {
             tvText.text = item.text
-            val time = timeFormatter.format(Date(item.timestamp))
-            val meta = if (item.latencyMs > 0) {
-                "$time • ${item.latencyMs.toInt()} ms"
+            tvMeta.text = timeFormatter.format(Date(item.timestamp))
+
+            val latency = if (item.sttLatencyMs > 0) item.sttLatencyMs else item.latencyMs
+            if (latency > 0) {
+                badgeStt.visibility = View.VISIBLE
+                badgeStt.text = "⚡ STT: ${latency.toInt()}ms"
             } else {
-                time
+                badgeStt.visibility = View.GONE
             }
-            tvMeta.text = meta
         }
     }
 
@@ -160,11 +183,38 @@ class ChatAdapter(
         private val tvText: TextView = itemView.findViewById(R.id.tvAssistantText)
         private val tvMeta: TextView = itemView.findViewById(R.id.tvAssistantMeta)
         private val pbStreaming: ProgressBar = itemView.findViewById(R.id.pbStreaming)
+        private val badgeLatency: TextView = itemView.findViewById(R.id.badgeAssistantLatency)
+        private val badgePlayback: TextView = itemView.findViewById(R.id.badgePlayback)
 
         fun bind(item: ChatMessage) {
             tvText.text = item.text
             tvMeta.text = timeFormatter.format(Date(item.timestamp))
             pbStreaming.visibility = if (item.isStreaming) View.VISIBLE else View.GONE
+
+            // TTFT and TTFA badges
+            val hasTtft = item.ttftMs > 0
+            val hasTtfa = item.ttfaMs > 0
+            if (hasTtft || hasTtfa) {
+                badgeLatency.visibility = View.VISIBLE
+                val ttftStr = if (hasTtft) "TTFT: ${item.ttftMs.toInt()}ms" else ""
+                val ttfaStr = if (hasTtfa) "TTFA: ${item.ttfaMs.toInt()}ms" else ""
+                badgeLatency.text = if (hasTtft && hasTtfa) "⚡ $ttftStr • $ttfaStr" else "⚡ ${ttftStr.ifEmpty { ttfaStr }}"
+            } else {
+                badgeLatency.visibility = View.GONE
+            }
+
+            // Playback status badge
+            if (item.isPlaying) {
+                badgePlayback.visibility = View.VISIBLE
+                badgePlayback.text = "🔊 In riproduzione"
+                badgePlayback.setTextColor(ContextCompat.getColor(itemView.context, R.color.accent_purple))
+            } else if (!item.isStreaming && item.text.isNotBlank() && item.text != "Sto pensando...") {
+                badgePlayback.visibility = View.VISIBLE
+                badgePlayback.text = "✓ Risposto"
+                badgePlayback.setTextColor(ContextCompat.getColor(itemView.context, R.color.text_muted))
+            } else {
+                badgePlayback.visibility = View.GONE
+            }
         }
     }
 
@@ -173,36 +223,46 @@ class ChatAdapter(
         private val tvHeader: TextView = itemView.findViewById(R.id.tvToolHeader)
         private val tvStatus: TextView = itemView.findViewById(R.id.tvToolStatus)
         private val tvSummary: TextView = itemView.findViewById(R.id.tvToolSummary)
+        private val pbProgress: ProgressBar = itemView.findViewById(R.id.pbToolProgress)
 
         fun bind(item: ChatMessage) {
             val name = item.toolName ?: "tool"
-            val icon = when (name.lowercase()) {
-                "web_search" -> "🔍"
-                "bash" -> "⚡"
-                "homeassistant", "hass" -> "🏠"
+            val isWebSearch = name.equals("web_search", ignoreCase = true)
+            val isBash = name.equals("bash", ignoreCase = true)
+
+            tvIcon.text = when {
+                isWebSearch -> "🔍"
+                isBash -> "💻"
+                name.contains("home", ignoreCase = true) -> "🏠"
                 else -> "⚙️"
             }
-            tvIcon.text = icon
 
-            val headerText = when (name.lowercase()) {
-                "web_search" -> {
-                    val query = extractQuery(item.toolArgs)
+            val query = extractQuery(item.toolArgs)
+            val headerText = when {
+                isWebSearch -> {
                     if (query.isNotEmpty()) "Ricerca Web: \"$query\"" else "Ricerca Web"
                 }
-                "bash" -> "Terminale: ${item.toolArgs ?: ""}"
+                isBash -> {
+                    val cmd = query.ifEmpty { item.toolArgs ?: "" }
+                    if (cmd.isNotEmpty()) "Comando Bash: \"$cmd\"" else "Comando Bash"
+                }
                 else -> "Strumento: $name"
             }
             tvHeader.text = headerText
 
             val isRunning = item.toolStatus == "running"
+            val isError = item.toolStatus == "error"
+
+            pbProgress.visibility = if (isRunning) View.VISIBLE else View.GONE
+
             if (isRunning) {
-                tvStatus.text = "In corso..."
-                tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.primary))
-            } else if (item.toolStatus == "error") {
-                tvStatus.text = "Fallito"
+                tvStatus.text = "Ricerca in corso..."
+                tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.accent_blue))
+            } else if (isError) {
+                tvStatus.text = "✗ Errore"
                 tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.accent_red))
             } else {
-                tvStatus.text = "✓ Completato"
+                tvStatus.text = if (isWebSearch) "✓ Risultati trovati" else "✓ Completato"
                 tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.secondary))
             }
 
@@ -220,8 +280,11 @@ class ChatAdapter(
                 if (args.contains("query")) {
                     val match = Regex("\"query\"\\s*:\\s*\"(.*?)\"").find(args)
                     match?.groupValues?.get(1) ?: args
+                } else if (args.contains("command")) {
+                    val match = Regex("\"command\"\\s*:\\s*\"(.*?)\"").find(args)
+                    match?.groupValues?.get(1) ?: args
                 } else {
-                    args.trim('"')
+                    args.trim('"', '{', '}', ' ')
                 }
             } catch (e: Exception) {
                 args

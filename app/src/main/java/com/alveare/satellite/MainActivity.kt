@@ -110,6 +110,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             showClearMemoryDialog()
         }
 
+        binding.badgeMemory.setOnClickListener {
+            showClearMemoryDialog()
+        }
+
         // 4. Listen Mode Quick Toggle (Tap badge to switch between Continuous and Push-to-Talk)
         binding.badgeListenMode.setOnClickListener {
             toggleListenMode()
@@ -160,17 +164,23 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun showClearMemoryDialog() {
         AlertDialog.Builder(this)
-            .setTitle("Cancella Memoria")
+            .setTitle("Nuova Conversazione / Cancella Memoria")
             .setMessage("Vuoi azzerare la memoria della conversazione e cancellare la cronologia dei messaggi?")
             .setPositiveButton("Azzera") { _, _ ->
                 webSocket?.sendClearMemory()
                 chatAdapter.clearMessages()
                 prefs.clearConversationHistory()
+                updateMemoryBadge()
                 binding.layoutEmptyChat.visibility = View.VISIBLE
                 Toast.makeText(this, "Memoria conversazione azzerata.", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Annulla", null)
             .show()
+    }
+
+    private fun updateMemoryBadge() {
+        val turnCount = chatAdapter.getMessages().count { it.sender == "user" }
+        binding.badgeMemory.text = "🧠 Memoria: $turnCount ${if (turnCount == 1) "turno" else "turni"}"
     }
 
     private fun toggleListenMode() {
@@ -214,6 +224,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             "🔊 TTS: Device (Nativo)"
         }
         binding.badgeTtsMode.text = ttsLabel
+        updateMemoryBadge()
     }
 
     private fun initAudioEngines() {
@@ -412,6 +423,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     private fun setAssistantSpeakingState(speaking: Boolean) {
         isAssistantSpeaking = speaking
+        chatAdapter.setAssistantPlaying(speaking)
         if (speaking) {
             captureManager?.isMuted?.set(true)
             binding.visualizerView.setState(VisualizerView.State.SPEAKING)
@@ -530,6 +542,17 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             if (ttftMs > 0) {
                 binding.badgeLatency.visibility = View.VISIBLE
                 binding.badgeLatency.text = "⚡ TTFT: ${ttftMs.toInt()} ms"
+                chatAdapter.updateAssistantMetrics(ttftMs = ttftMs)
+                scrollToBottom()
+            }
+        }
+    }
+
+    override fun onTtfa(ttfaMs: Float) {
+        runOnUiThread {
+            if (ttfaMs > 0) {
+                chatAdapter.updateAssistantMetrics(ttfaMs = ttfaMs)
+                scrollToBottom()
             }
         }
     }
@@ -546,6 +569,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 ChatMessage(
                     sender = "user",
                     text = text,
+                    sttLatencyMs = latencyMs,
                     latencyMs = latencyMs
                 )
             )
@@ -564,6 +588,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
                 binding.badgeLatency.text = "⚡ STT: ${latencyMs.toInt()} ms"
             }
 
+            updateMemoryBadge()
             scrollToBottom()
         }
     }
@@ -605,8 +630,10 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
 
     override fun onTurnCompleted(turnId: Int, fullText: String?) {
         runOnUiThread {
+            chatAdapter.setAssistantPlaying(false)
             chatAdapter.finalizeAssistant(fullText)
             prefs.saveConversationHistory(chatAdapter.getMessages())
+            updateMemoryBadge()
             scrollToBottom()
 
             binding.btnInterrupt.visibility = View.GONE
@@ -631,6 +658,7 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         runOnUiThread {
             chatAdapter.clearMessages()
             prefs.clearConversationHistory()
+            updateMemoryBadge()
             binding.layoutEmptyChat.visibility = View.VISIBLE
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
@@ -675,11 +703,11 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         val seekPitch = dialogView.findViewById<SeekBar>(R.id.seekPitch)
         val tvPitchLabel = dialogView.findViewById<TextView>(R.id.tvPitchLabel)
 
-        val rgListenMode = dialogView.findViewById<RadioGroup>(R.id.rgListenMode)
         val rbListenContinuous = dialogView.findViewById<RadioButton>(R.id.rbListenContinuous)
         val rbListenPushToTalk = dialogView.findViewById<RadioButton>(R.id.rbListenPushToTalk)
         val switchWakeWord = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchWakeWord)
         val switchKeepScreenOn = dialogView.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchKeepScreenOn)
+        val btnClearMemoryNow = dialogView.findViewById<MaterialButton>(R.id.btnClearMemoryNow)
         val seekContextTurns = dialogView.findViewById<SeekBar>(R.id.seekContextTurns)
         val tvContextTurnsLabel = dialogView.findViewById<TextView>(R.id.tvContextTurnsLabel)
 
@@ -712,9 +740,27 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             }.start()
         }
 
-        // Reset to default LAN URL
+        // Reset to default LAN PC IP with immediate diagnostic test
         btnResetDefaultUrl.setOnClickListener {
             etServerUrl.setText(AppPreferences.DEFAULT_SERVER_URL)
+            btnTestConnection.performClick()
+        }
+
+        // Dedicated Clear Memory button in Settings
+        btnClearMemoryNow.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Nuova Conversazione / Cancella Memoria")
+                .setMessage("Vuoi azzerare la memoria della conversazione e cancellare la cronologia dei messaggi?")
+                .setPositiveButton("Azzera") { _, _ ->
+                    webSocket?.sendClearMemory()
+                    chatAdapter.clearMessages()
+                    prefs.clearConversationHistory()
+                    updateMemoryBadge()
+                    binding.layoutEmptyChat.visibility = View.VISIBLE
+                    Toast.makeText(this, "Memoria conversazione azzerata.", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Annulla", null)
+                .show()
         }
 
         // TTS Mode
@@ -766,13 +812,15 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
         switchWakeWord.isChecked = prefs.isWakeWordEnabled
         switchKeepScreenOn.isChecked = prefs.isSmartDisplayEnabled
 
-        // Context Turns Slider
-        seekContextTurns.progress = prefs.contextTurns
-        tvContextTurnsLabel.text = "Memoria Conversazione: ${prefs.contextTurns} turni"
+        // Context Turns Slider (range 2 to 16)
+        val initialTurns = prefs.contextTurns.coerceIn(2, 16)
+        seekContextTurns.max = 14
+        seekContextTurns.progress = initialTurns - 2
+        tvContextTurnsLabel.text = "Memoria Contestuale: $initialTurns turni (da 2 a 16)"
         seekContextTurns.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val turns = progress.coerceAtLeast(2)
-                tvContextTurnsLabel.text = "Memoria Conversazione: $turns turni"
+                val turns = progress + 2
+                tvContextTurnsLabel.text = "Memoria Contestuale: $turns turni (da 2 a 16)"
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -798,7 +846,9 @@ class MainActivity : AppCompatActivity(), AlveareLiveWebSocket.LiveWebSocketList
             prefs.isSmartDisplayEnabled = switchKeepScreenOn.isChecked
             applySmartDisplayMode()
 
-            prefs.contextTurns = seekContextTurns.progress.coerceAtLeast(2)
+            val selectedTurns = (seekContextTurns.progress + 2).coerceIn(2, 16)
+            prefs.contextTurns = selectedTurns
+            webSocket?.sendConfig(selectedTurns)
 
             binding.tvRoomSubtitle.text = "${prefs.roomName} • Smart Satellite"
             updateBadges()

@@ -6,9 +6,13 @@ data class ChatMessage(
     var text: String,
     val timestamp: Long = System.currentTimeMillis(),
     var isStreaming: Boolean = false,
+    var isPlaying: Boolean = false,
+    var sttLatencyMs: Float = 0f,
+    var ttftMs: Float = 0f,
+    var ttfaMs: Float = 0f,
     var latencyMs: Float = 0f,
     var toolName: String? = null,
     var toolArgs: String? = null,
     var toolSummary: String? = null,
-    var toolStatus: String? = "success"
+    var toolStatus: String? = "success" // "running", "ok", "success", "error"
 )

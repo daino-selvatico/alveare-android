@@ -26,6 +26,7 @@ class AlveareLiveWebSocket(
         fun onVadSpeechStart()
         fun onVadSpeechEnd()
         fun onTtft(ttftMs: Float)
+        fun onTtfa(ttfaMs: Float) {}
         fun onUserTranscript(text: String, latencyMs: Float)
         fun onAssistantDelta(delta: String)
         fun onAssistantSentence(sentence: String)
@@ -159,14 +160,28 @@ class AlveareLiveWebSocket(
                         val pcm = Base64.decode(rawB64, Base64.DEFAULT)
                         listener.onAudioChunkReceived(pcm, event.sampleRate)
                     }
+                    if (event.ttfaMs > 0) {
+                        listener.onTtfa(event.ttfaMs)
+                    }
                 }
                 "tool_call", "tool_call_start" -> {
-                    val argsStr = event.arguments?.toString() ?: event.toolArgs?.toString()
+                    val tName = event.tool ?: event.toolName ?: "tool"
+                    val argsStr = event.query ?: event.command ?: event.arguments?.toString() ?: event.toolArgs?.toString()
                     listener.onToolCall(
-                        event.toolName ?: "tool",
+                        tName,
                         argsStr,
-                        event.resultSummary,
-                        event.status ?: "running"
+                        event.summary ?: event.resultSummary,
+                        "running"
+                    )
+                }
+                "tool_call_done", "tool_call_end" -> {
+                    val tName = event.tool ?: event.toolName ?: "tool"
+                    val argsStr = event.query ?: event.command ?: event.arguments?.toString() ?: event.toolArgs?.toString()
+                    listener.onToolCall(
+                        tName,
+                        argsStr,
+                        event.summary ?: event.resultSummary,
+                        event.status ?: "ok"
                     )
                 }
                 "turn_complete" -> {

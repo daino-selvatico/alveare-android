@@ -113,8 +113,8 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🔄 IP Default"
-                android:textColor="@color/text_muted"
+                android:text="🔄 Ripristina IP PC"
+                android:textColor="@color/primary"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -272,22 +272,51 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp" />
 
-        <!-- Context Turns Slider -->
+        <!-- Memory & Context Management -->
         <TextView
-            android:id="@+id/tvContextTurnsLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Finestra Contesto: 6 turni memorizzati"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:layout_marginTop="14dp"
+            android:text="🧠 Gestione Memoria Conversazione"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
-        <SeekBar
-            android:id="@+id/seekContextTurns"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="14"
-            android:progress="4" />
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvContextTurnsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Memoria Contestuale: 6 turni (da 2 a 16)"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <SeekBar
+                android:id="@+id/seekContextTurns"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="14"
+                android:progress="4" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClearMemoryNow"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="🗑️ Cancella Memoria Ora"
+                android:textColor="@color/accent_red"
+                android:textSize="12sp"
+                app:strokeColor="@color/accent_red" />
+        </LinearLayout>
 
         <!-- Action Buttons -->
         <LinearLayout
