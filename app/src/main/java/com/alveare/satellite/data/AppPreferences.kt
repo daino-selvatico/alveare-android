@@ -20,6 +20,7 @@ class AppPreferences(context: Context) {
         const val KEY_SMART_DISPLAY = "smart_display"
         const val KEY_CONTEXT_TURNS = "context_turns"
         const val KEY_CHAT_HISTORY = "chat_history_json"
+        const val KEY_AEC_SAFE_MODE = "aec_safe_mode"
 
         const val DEFAULT_SERVER_URL = "wss://192.168.132.197:8443/ws/live"
         const val DEFAULT_ROOM_NAME = "Salotto"
@@ -29,6 +30,9 @@ class AppPreferences(context: Context) {
         const val LISTEN_MODE_PUSH_TO_TALK = "push_to_talk"
         const val LISTEN_MODE_CONTINUOUS = "continuous"
         const val LISTEN_MODE_WAKE_WORD = "wake_word"
+
+        const val SATELLITE_MODE_ASSISTANT = "assistant"
+        const val SATELLITE_MODE_LIVE = "live"
 
         /**
          * Normalizes any server URL input into a valid WebSocket URL.
@@ -40,29 +44,41 @@ class AppPreferences(context: Context) {
          * - "wss://192.168.132.197:8443/ws/live" -> unmodified
          */
         fun normalizeServerUrl(input: String): String {
-            var raw = input.trim()
+            var raw = input.trim().replace("\\s+".toRegex(), "")
             if (raw.isEmpty()) return DEFAULT_SERVER_URL
 
             raw = raw.trimEnd('/')
 
+            var explicitScheme = false
             var isSsl = true
             if (raw.startsWith("http://", ignoreCase = true)) {
                 isSsl = false
+                explicitScheme = true
                 raw = raw.substring(7)
             } else if (raw.startsWith("https://", ignoreCase = true)) {
                 isSsl = true
+                explicitScheme = true
                 raw = raw.substring(8)
             } else if (raw.startsWith("ws://", ignoreCase = true)) {
                 isSsl = false
+                explicitScheme = true
                 raw = raw.substring(5)
             } else if (raw.startsWith("wss://", ignoreCase = true)) {
                 isSsl = true
+                explicitScheme = true
                 raw = raw.substring(6)
             }
 
             val slashIdx = raw.indexOf('/')
-            val hostPort = if (slashIdx != -1) raw.substring(0, slashIdx) else raw
+            var hostPort = if (slashIdx != -1) raw.substring(0, slashIdx) else raw
             var path = if (slashIdx != -1) raw.substring(slashIdx) else ""
+
+            // Android cannot natively resolve mDNS .local hostnames over Wi-Fi
+            if (hostPort.startsWith("daino-ai.local", ignoreCase = true)) {
+                hostPort = "192.168.132.197" + hostPort.substring("daino-ai.local".length)
+            } else if (hostPort.equals("daino-ai", ignoreCase = true) || hostPort.startsWith("daino-ai:", ignoreCase = true)) {
+                hostPort = "192.168.132.197" + hostPort.substring("daino-ai".length)
+            }
 
             val finalHostPort = if (!hostPort.contains(':')) {
                 "$hostPort:8443"
@@ -70,11 +86,13 @@ class AppPreferences(context: Context) {
                 hostPort
             }
 
-            // If port is 8443 or 443, it MUST use SSL (wss://) because Alveare runs on HTTPS/WSS!
-            if (finalHostPort.endsWith(":8443") || finalHostPort.endsWith(":443")) {
-                isSsl = true
-            } else if (finalHostPort.endsWith(":8080") || finalHostPort.endsWith(":8000") || finalHostPort.endsWith(":80")) {
-                isSsl = false
+            // Only infer SSL from port if no explicit scheme was specified by the user
+            if (!explicitScheme) {
+                if (finalHostPort.endsWith(":8443") || finalHostPort.endsWith(":443")) {
+                    isSsl = true
+                } else if (finalHostPort.endsWith(":8080") || finalHostPort.endsWith(":8000") || finalHostPort.endsWith(":80")) {
+                    isSsl = false
+                }
             }
 
             if (path.isEmpty() || path == "/") {
@@ -144,6 +162,18 @@ class AppPreferences(context: Context) {
         get() = prefs.getString(KEY_LISTEN_MODE, LISTEN_MODE_PUSH_TO_TALK) ?: LISTEN_MODE_PUSH_TO_TALK
         set(value) = prefs.edit().putString(KEY_LISTEN_MODE, value).apply()
 
+    var satelliteMode: String
+        get() {
+            val raw = prefs.getString(KEY_LISTEN_MODE, SATELLITE_MODE_ASSISTANT) ?: SATELLITE_MODE_ASSISTANT
+            return when (raw) {
+                LISTEN_MODE_CONTINUOUS, SATELLITE_MODE_LIVE -> SATELLITE_MODE_LIVE
+                else -> SATELLITE_MODE_ASSISTANT
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_LISTEN_MODE, value).apply()
+        }
+
     var isSmartDisplayEnabled: Boolean
         get() = prefs.getBoolean(KEY_SMART_DISPLAY, true)
         set(value) = prefs.edit().putBoolean(KEY_SMART_DISPLAY, value).apply()
@@ -151,6 +181,10 @@ class AppPreferences(context: Context) {
     var contextTurns: Int
         get() = prefs.getInt(KEY_CONTEXT_TURNS, 6)
         set(value) = prefs.edit().putInt(KEY_CONTEXT_TURNS, value).apply()
+
+    var isAecSafeMode: Boolean
+        get() = prefs.getBoolean(KEY_AEC_SAFE_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_AEC_SAFE_MODE, value).apply()
 
     fun getConversationHistory(): MutableList<ChatMessage> {
         val jsonStr = prefs.getString(KEY_CHAT_HISTORY, null) ?: return mutableListOf()

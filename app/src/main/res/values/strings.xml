@@ -1,41 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Alveare</string>
-    <string name="app_subtitle">Smart Home Neural Satellite</string>
-    
-    <!-- Status -->
+    <string name="app_subtitle">Smart Satellite</string>
+
+    <!-- State Strings -->
     <string name="status_disconnected">Disconnesso</string>
     <string name="status_connecting">Connessione in corso...</string>
     <string name="status_connected">Connesso ad Alveare</string>
     <string name="status_ready">Pronto</string>
-    <string name="status_listening">In ascolto...</string>
-    <string name="status_processing">Elaborazione...</string>
+    <string name="status_ready_assistant_wake">In attesa di \"Ehi Alveare\" o tocca per parlare</string>
+    <string name="status_ready_assistant_tap">Pronto • Tocca per parlare</string>
+    <string name="status_live_streaming">Sempre in ascolto • Parla liberamente</string>
+    <string name="status_listening">In ascolto... parla ora</string>
+    <string name="status_processing">Sto elaborando...</string>
     <string name="status_speaking">Alveare parla...</string>
+    <string name="status_privacy_muted">🔇 Microfono disattivato (Privacy attiva)</string>
     <string name="status_interrupted">Interrotto</string>
-    
+
+    <!-- Mode Strings -->
+    <string name="mode_assistant">Assistente</string>
+    <string name="mode_assistant_desc">Singola interazione: comando -> risposta -> attesa</string>
+    <string name="mode_live">Live</string>
+    <string name="mode_live_desc">Conversazione continua con interruzione naturale</string>
+
     <!-- Actions -->
     <string name="action_tap_to_speak">Tocca per parlare</string>
-    <string name="action_listening">Ti ascolto... tocca per inviare</string>
+    <string name="action_listening">In ascolto... tocca per completare</string>
     <string name="action_interrupt">Interrompi</string>
+    <string name="action_privacy_mute">Privacy Muto</string>
+    <string name="action_privacy_unmute">Riattiva Microfono</string>
     <string name="action_settings">Impostazioni</string>
     <string name="action_save">Salva impostazioni</string>
     <string name="action_cancel">Annulla</string>
     <string name="action_test_connection">Test Connessione</string>
-    
-    <!-- Settings -->
-    <string name="settings_title">Impostazioni Satellite</string>
-    <string name="settings_server_url">Indirizzo Server Alveare (WebSocket /ws/live)</string>
-    <string name="settings_server_url_hint">es. ws://192.168.50.1:8443/ws/live</string>
-    <string name="settings_trust_ssl">Ignora certificati SSL self-signed (WSS locale)</string>
-    <string name="settings_tts_section">Modalità Sintesi Vocale (TTS)</string>
-    <string name="settings_tts_server">Sintesi Lato Server (Kokoro-82M / Audio8 streaming)</string>
-    <string name="settings_tts_device">Sintesi Lato Dispositivo (Android Native TTS - Zero carico server)</string>
+    <string name="action_clear_memory">Nuova Conversazione / Cancella Cronologia</string>
+    <string name="action_reconnect">Riconnetti al server</string>
+
+    <!-- Settings Dialog -->
+    <string name="settings_title">Impostazioni Satellite Alveare</string>
+    <string name="settings_room_name">Nome Stanza / Dispositivo</string>
+    <string name="settings_room_hint">es. Salotto, Cucina, Studio</string>
+    <string name="settings_server_url">Indirizzo WebSocket Server (/ws/live)</string>
+    <string name="settings_server_url_hint">es. wss://192.168.132.197:8443/ws/live</string>
+    <string name="settings_trust_ssl">Consenti certificati TLS autofirmati (LAN)</string>
+    <string name="settings_tls_warning">⚠️ Avviso TLS: L\'abilitazione disattiva la verifica dell\'autorità di certificazione. Usare solo su reti locali protette.</string>
+    <string name="settings_mode_section">Modalità di Funzionamento</string>
+    <string name="settings_tts_section">Sintesi Vocale (TTS)</string>
+    <string name="settings_tts_server">Sintesi Server (Kokoro-82M WAV 24kHz stream)</string>
+    <string name="settings_tts_device">Sintesi Locale Dispositivo (Android Native TTS)</string>
     <string name="settings_tts_speech_rate">Velocità Voce Locale</string>
-    <string name="settings_tts_pitch">Intonazione (Pitch) Voce Locale</string>
-    <string name="settings_wake_word_section">Wake Word &amp; Ascolto</string>
-    <string name="settings_wake_word_enable">Attiva Wake Word (\"Ehi Alveare\")</string>
-    <string name="settings_wake_word_sensitivity">Sensibilità Microfono / VAD</string>
-    <string name="settings_smart_display">Modalità Smart Display (Schermo sempre attivo)</string>
-    <string name="settings_context_turns">Finestra Contesto (turni memorizzati)</string>
-    <string name="settings_max_tokens">Max Token Risposta (default 120)</string>
+    <string name="settings_tts_pitch">Intonazione Voce Locale</string>
+    <string name="settings_wake_word_section">Riconoscimento Vocale Offline (Wake Phrase)</string>
+    <string name="settings_wake_word_enable">Attiva Wake Word \"Ehi Alveare\" (offline Kaldi/Vosk)</string>
+    <string name="settings_wake_word_ready">✓ Modello Vosk italiano installato (49 MB). Wake phrase offline pronta.</string>
+    <string name="settings_wake_word_missing">✗ Modello offline non installato. Per usare \"Ehi Alveare\" scarica il modello compatto (~43 MB).</string>
+    <string name="settings_wake_word_download">Scarica Modello Vosk (~43 MB)</string>
+    <string name="settings_wake_word_cancel">Annulla Download</string>
+    <string name="settings_wake_word_delete">Elimina Modello</string>
+    <string name="settings_smart_display">Modalità Smart Display (Schermo sempre acceso)</string>
+    <string name="settings_context_turns">Memoria di Contesto Alveare (turni)</string>
 </resources>

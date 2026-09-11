@@ -9,9 +9,12 @@ data class LiveEvent(
     val delta: String? = null,
     val data: String? = null, // Base64 audio if present
     @SerializedName("audio_b64") val audioB64: String? = null,
+    val format: String? = null,
     val error: String? = null,
     @SerializedName("turn_id") val turnId: Int = 0,
     @SerializedName("sample_rate") val sampleRate: Int = 24000,
+    @SerializedName("input_sample_rate") val inputSampleRate: Int? = null,
+    @SerializedName("output_sample_rate") val outputSampleRate: Int? = null,
     @SerializedName("stt_latency_ms") val sttLatencyMs: Float = 0f,
     @SerializedName("ttft_ms") val ttftMs: Float = 0f,
     @SerializedName("ttfa_ms") val ttfaMs: Float = 0f,

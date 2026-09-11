@@ -20,6 +20,7 @@
     
     <color name="accent_blue">#3B82F6</color> <!-- Cyber Blue Connected -->
     <color name="accent_purple">#8B5CF6</color> <!-- Violet Speaking -->
+    <color name="accent_orange">#F97316</color> <!-- TLS Warning / Orange -->
     <color name="accent_red">#EF4444</color> <!-- Error / Disconnected -->
     <color name="accent_gray">#64748B</color>
     

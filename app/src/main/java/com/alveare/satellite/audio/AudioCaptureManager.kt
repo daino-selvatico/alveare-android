@@ -7,44 +7,68 @@ import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
+import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 import kotlin.math.sqrt
 
+/**
+ * Single AudioRecord owner for Alveare smart speaker.
+ * Feeds PCM wake recognizer while idle and WebSocket after activation.
+ * Enforces real hardware stop/release on privacy mute, safe-mode AEC handling,
+ * and half-duplex self-trigger prevention in Assistant mode while allowing full-duplex
+ * AEC uplink in Live mode.
+ */
 class AudioCaptureManager(
     private val sampleRate: Int = 16000,
     private val onAudioChunkReady: (ByteArray) -> Unit,
     private val onAmplitudeChanged: (Float) -> Unit,
     private val onSpeechStarted: () -> Unit = {},
-    private val onSilenceDetected: () -> Unit = {}
+    private val onSilenceDetected: () -> Unit = {},
+    private val onWakeWordAudioChunk: (ByteArray, Int) -> Unit = { _, _ -> }
 ) {
+    companion object {
+        private const val TAG = "AudioCapture"
+    }
+
     private var audioRecord: AudioRecord? = null
     private var aec: AcousticEchoCanceler? = null
     private var ns: NoiseSuppressor? = null
     private var agc: AutomaticGainControl? = null
 
-    private val isRecording = AtomicBoolean(false)
+    val isRecording = AtomicBoolean(false)
     val isStreamingAudio = AtomicBoolean(false)
-    val isMuted = AtomicBoolean(false)
+    val isPrivacyMuted = AtomicBoolean(false)
+    val isAssistantSpeaking = AtomicBoolean(false)
     private var captureThread: Thread? = null
 
-    // Adaptive VAD parameters (tuned for natural mobile microphone distance)
+    // Adaptive client VAD parameters for Assistant mode cutoff
     private var speechFramesCount = 0
     private var silenceFramesCount = 0
-    var speechThresholdRms = 140.0f
-    private val silenceFramesNeeded = 16 // ~320ms of silence at 20ms frames
+    var speechThresholdRms = 110.0f
+    private val silenceFramesNeeded = 35 // ~1400ms natural pause tolerance at 40ms frames
+    private var hasDetectedSpeech = false
+    private var streamStartTimestamp = 0L
 
     private val mutedUntilMs = AtomicLong(0L)
+    var isContinuousMode: Boolean = false
+    var isAecSafeMode: Boolean = true
 
     fun muteFor(durationMs: Long) {
         val target = System.currentTimeMillis() + durationMs
         mutedUntilMs.set(maxOf(mutedUntilMs.get(), target))
     }
 
+    @Synchronized
     @SuppressLint("MissingPermission")
-    fun start() {
-        if (isRecording.getAndSet(true)) return
+    fun start(): Boolean {
+        if (isPrivacyMuted.get()) {
+            Log.i(TAG, "Audio capture not started because privacy mute is active")
+            return false
+        }
+
+        if (isRecording.get()) return true
 
         val minBufferSize = AudioRecord.getMinBufferSize(
             sampleRate,
@@ -54,7 +78,7 @@ class AudioCaptureManager(
         val bufferSize = max(minBufferSize * 2, 4096)
 
         try {
-            // Prefer VOICE_COMMUNICATION for hardware Acoustic Echo Cancellation (AEC) and VoIP pipeline
+            // Prefer VOICE_COMMUNICATION for hardware Acoustic Echo Cancellation (AEC)
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 sampleRate,
@@ -84,39 +108,40 @@ class AudioCaptureManager(
             }
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                isRecording.set(false)
-                return
+                Log.e(TAG, "AudioRecord failed to initialize")
+                audioRecord?.release()
+                audioRecord = null
+                return false
             }
 
-            // Enable hardware audio effects if available on device
+            // Enable hardware audio effects if available
             try {
                 val sessionId = audioRecord?.audioSessionId ?: 0
                 if (sessionId > 0) {
                     if (AcousticEchoCanceler.isAvailable()) {
-                        aec = AcousticEchoCanceler.create(sessionId)?.apply {
-                            enabled = true
-                        }
+                        aec = AcousticEchoCanceler.create(sessionId)?.apply { enabled = true }
                     }
                     if (NoiseSuppressor.isAvailable()) {
-                        ns = NoiseSuppressor.create(sessionId)?.apply {
-                            enabled = true
-                        }
+                        ns = NoiseSuppressor.create(sessionId)?.apply { enabled = true }
                     }
                     if (AutomaticGainControl.isAvailable()) {
-                        agc = AutomaticGainControl.create(sessionId)?.apply {
-                            enabled = true
-                        }
+                        agc = AutomaticGainControl.create(sessionId)?.apply { enabled = true }
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.w(TAG, "Could not attach audio effects: ${e.message}")
             }
 
             audioRecord?.startRecording()
+            isRecording.set(true)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to start AudioRecord: ${e.message}", e)
+            try {
+                audioRecord?.release()
+            } catch (ignored: Exception) {}
+            audioRecord = null
             isRecording.set(false)
-            return
+            return false
         }
 
         captureThread = Thread({
@@ -127,18 +152,26 @@ class AudioCaptureManager(
                 val readCount = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: -1
                 if (readCount > 0) {
                     val now = System.currentTimeMillis()
-                    if (isMuted.get() || now < mutedUntilMs.get()) {
+
+                    if (now < mutedUntilMs.get()) {
                         onAmplitudeChanged(0.0f)
                         continue
                     }
 
-                    // 1. Calculate RMS Amplitude
+                    // In Assistant mode (half duplex) OR Live AEC Safe Mode (devices without verified AEC):
+                    // skip capture frames while assistant is speaking to prevent self-trigger or acoustic feedback.
+                    // In normal Live full duplex: uplink continues during playback so server can detect barge-in!
+                    if (isAssistantSpeaking.get() && (!isContinuousMode || isAecSafeMode)) {
+                        onAmplitudeChanged(0.0f)
+                        continue
+                    }
+
+                    // 1. Calculate RMS Amplitude & convert to little-endian bytes
                     var sumSquare = 0.0
                     for (i in 0 until readCount) {
                         val sample = audioBuffer[i].toDouble()
                         sumSquare += sample * sample
 
-                        // Convert to little-endian bytes
                         val byteIdx = i * 2
                         byteBuffer[byteIdx] = (audioBuffer[i].toInt() and 0xFF).toByte()
                         byteBuffer[byteIdx + 1] = ((audioBuffer[i].toInt() shr 8) and 0xFF).toByte()
@@ -151,20 +184,42 @@ class AudioCaptureManager(
                     }
                     onAmplitudeChanged(normalizedAmp)
 
-                    // 2. If actively streaming to Alveare, forward the chunk and check VAD
+                    val bytesLen = readCount * 2
+
+                    // 2. Route PCM: to active WebSocket if streaming, or to offline wake recognizer if idle
                     if (isStreamingAudio.get()) {
-                        val bytesToSend = byteBuffer.copyOf(readCount * 2)
+                        val bytesToSend = byteBuffer.copyOf(bytesLen)
                         onAudioChunkReady(bytesToSend)
 
-                        // If not in continuous server-managed VAD mode, do client-side silence cutoff
+                        // Client-side silence cutoff for Assistant mode
                         if (!isContinuousMode) {
-                            if (rms >= speechThresholdRms) {
-                                speechFramesCount++
-                                silenceFramesCount = 0
+                            val nowMs = System.currentTimeMillis()
+                            if (!hasDetectedSpeech) {
+                                if (rms >= speechThresholdRms) {
+                                    speechFramesCount++
+                                    if (speechFramesCount >= 6) { // Spoke at least ~240ms
+                                        hasDetectedSpeech = true
+                                        silenceFramesCount = 0
+                                        onSpeechStarted()
+                                    }
+                                } else {
+                                    if (speechFramesCount > 0) speechFramesCount--
+                                    // User activated assistant mode but did not speak within 8.0 seconds
+                                    if (nowMs - streamStartTimestamp > 8000L) {
+                                        hasDetectedSpeech = false
+                                        speechFramesCount = 0
+                                        silenceFramesCount = 0
+                                        onSilenceDetected()
+                                    }
+                                }
                             } else {
-                                if (speechFramesCount > 4) { // Spoke at least ~160ms
+                                // User has started speaking: count silence frames to detect natural turn completion
+                                if (rms >= speechThresholdRms) {
+                                    silenceFramesCount = 0
+                                } else {
                                     silenceFramesCount++
-                                    if (silenceFramesCount >= silenceFramesNeeded) {
+                                    if (silenceFramesCount >= silenceFramesNeeded) { // ~1400ms silence
+                                        hasDetectedSpeech = false
                                         silenceFramesCount = 0
                                         speechFramesCount = 0
                                         onSilenceDetected()
@@ -173,8 +228,11 @@ class AudioCaptureManager(
                             }
                         }
                     } else {
+                        // Pass to offline wake phrase recognizer (single AudioRecord owner!)
                         silenceFramesCount = 0
                         speechFramesCount = 0
+                        hasDetectedSpeech = false
+                        onWakeWordAudioChunk(byteBuffer, bytesLen)
                     }
                 }
             }
@@ -182,13 +240,16 @@ class AudioCaptureManager(
             priority = Thread.MAX_PRIORITY
             start()
         }
-    }
 
-    var isContinuousMode: Boolean = false
+        return true
+    }
 
     fun startStreaming() {
         silenceFramesCount = 0
         speechFramesCount = 0
+        hasDetectedSpeech = false
+        streamStartTimestamp = System.currentTimeMillis()
+        muteFor(450L) // Mute capture during wake/tap chime playback
         isStreamingAudio.set(true)
     }
 
@@ -196,9 +257,11 @@ class AudioCaptureManager(
         isStreamingAudio.set(false)
         silenceFramesCount = 0
         speechFramesCount = 0
+        hasDetectedSpeech = false
     }
 
-    fun release() {
+    @Synchronized
+    fun stop() {
         isRecording.set(false)
         isStreamingAudio.set(false)
         captureThread?.interrupt()
@@ -214,5 +277,9 @@ class AudioCaptureManager(
             audioRecord?.release()
         } catch (ignored: Exception) {}
         audioRecord = null
+    }
+
+    fun release() {
+        stop()
     }
 }

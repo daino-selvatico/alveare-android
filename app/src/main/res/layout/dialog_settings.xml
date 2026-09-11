@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/surface"
-    android:padding="20dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -24,21 +24,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Configura la connessione al server Alveare e l'hardware del satellite"
+            android:text="Configurazione satellite per Alveare smart speaker"
             android:textColor="@color/text_muted"
             android:textSize="12sp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="14dp"
+            android:layout_marginVertical="12dp"
             android:background="@color/surface_card_stroke" />
 
         <!-- Room / Satellite Name -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Nome Stanza / Satellite"
+            android:text="@string/settings_room_name"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -47,9 +47,10 @@
             android:id="@+id/etRoomName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:minHeight="48dp"
+            android:layout_marginTop="4dp"
             android:background="@drawable/bg_card"
-            android:hint="es. Salotto, Cucina, Scrivania"
+            android:hint="@string/settings_room_hint"
             android:padding="12dp"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_muted"
@@ -59,7 +60,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="@string/settings_server_url"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
@@ -69,7 +70,8 @@
             android:id="@+id/etServerUrl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:minHeight="48dp"
+            android:layout_marginTop="4dp"
             android:background="@drawable/bg_card"
             android:hint="@string/settings_server_url_hint"
             android:inputType="textUri"
@@ -78,18 +80,31 @@
             android:textColorHint="@color/text_muted"
             android:textSize="14sp" />
 
-        <!-- Trust Self-Signed SSL Switch -->
+        <!-- Trust Self-Signed SSL Switch & Explicit TLS Warning -->
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switchTrustSsl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:layout_marginTop="6dp"
             android:checked="true"
             android:text="@string/settings_trust_ssl"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
-        <!-- Test Connection & Reset URL Buttons -->
+        <TextView
+            android:id="@+id/tvTlsWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_card"
+            android:padding="10dp"
+            android:text="@string/settings_tls_warning"
+            android:textColor="@color/accent_orange"
+            android:textSize="11sp"
+            android:visibility="visible" />
+
+        <!-- Test Connection & Reset Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -100,10 +115,10 @@
                 android:id="@+id/btnTestConnection"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:text="🧪 Testa Connessione"
+                android:text="🧪 Verifica Connessione"
                 android:textColor="@color/primary"
                 android:textSize="12sp"
                 app:strokeColor="@color/primary" />
@@ -112,8 +127,8 @@
                 android:id="@+id/btnResetDefaultUrl"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🔄 Ripristina IP PC"
+                android:layout_height="48dp"
+                android:text="🔄 Reset IP"
                 android:textColor="@color/primary"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -133,7 +148,143 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="14dp"
+            android:layout_marginVertical="12dp"
+            android:background="@color/surface_card_stroke" />
+
+        <!-- Operational Mode Section -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_mode_section"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgListenMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <RadioButton
+                android:id="@+id/rbListenAssistant"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:checked="true"
+                android:text="🤖 Assistente (Turno singolo: risponde e torna in attesa)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <RadioButton
+                android:id="@+id/rbListenLive"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="⚡ Live Sperimentale (Streaming audio continuo, VAD server, interrupt)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+        </RadioGroup>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="12dp"
+            android:background="@color/surface_card_stroke" />
+
+        <!-- Real Offline Wake Word Section (Vosk) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_wake_word_section"
+            android:textColor="@color/primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchWakeWord"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:layout_marginTop="4dp"
+            android:checked="false"
+            android:text="@string/settings_wake_word_enable"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
+
+        <!-- Vosk Model Status & Management Card -->
+        <LinearLayout
+            android:id="@+id/layoutVoskModelCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvVoskModelStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_wake_word_missing"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/pbVoskDownload"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="8dp"
+                android:max="100"
+                android:progress="0"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDownloadVoskModel"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="@string/settings_wake_word_download"
+                    android:textSize="11sp"
+                    app:backgroundTint="@color/primary"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCancelVoskDownload"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/settings_wake_word_cancel"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    app:cornerRadius="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeleteVoskModel"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="6dp"
+                    android:text="@string/settings_wake_word_delete"
+                    android:textColor="@color/accent_red"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="12dp"
             android:background="@color/surface_card_stroke" />
 
         <!-- TTS Section -->
@@ -149,12 +300,13 @@
             android:id="@+id/rgTtsMode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="6dp">
 
             <RadioButton
                 android:id="@+id/rbTtsServer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:checked="true"
                 android:text="@string/settings_tts_server"
                 android:textColor="@color/text_primary"
@@ -164,17 +316,18 @@
                 android:id="@+id/rbTtsDevice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:text="@string/settings_tts_device"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
         </RadioGroup>
 
-        <!-- Native TTS Sliders (Visible when Device TTS is selected) -->
+        <!-- Device TTS Sliders -->
         <LinearLayout
             android:id="@+id/layoutDeviceTtsSettings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:background="@drawable/bg_card"
             android:orientation="vertical"
             android:padding="12dp"
@@ -184,7 +337,7 @@
                 android:id="@+id/tvSpeechRateLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Velocità Parlato: 1.0x"
+                android:text="Velocità Voce: 1.0x"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
@@ -192,6 +345,7 @@
                 android:id="@+id/seekSpeechRate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:max="20"
                 android:progress="10" />
 
@@ -199,7 +353,7 @@
                 android:id="@+id/tvPitchLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
                 android:text="Intonazione (Pitch): 1.0x"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
@@ -208,6 +362,7 @@
                 android:id="@+id/seekPitch"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="48dp"
                 android:max="20"
                 android:progress="10" />
         </LinearLayout>
@@ -215,68 +370,25 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginVertical="14dp"
+            android:layout_marginVertical="12dp"
             android:background="@color/surface_card_stroke" />
-
-        <!-- Listen Mode & Audio Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Modalità di Ascolto Satellite"
-            android:textColor="@color/primary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <RadioGroup
-            android:id="@+id/rgListenMode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
-
-            <RadioButton
-                android:id="@+id/rbListenContinuous"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="🎙️ Sempre in ascolto (Hands-free • Smart Speaker)"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
-
-            <RadioButton
-                android:id="@+id/rbListenPushToTalk"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="👆 Tocca per parlare (Push-to-Talk manuale)"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
-        </RadioGroup>
-
-        <com.google.android.material.switchmaterial.SwitchMaterial
-            android:id="@+id/switchWakeWord"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:checked="false"
-            android:text="👂 Wake Word 'Ehi Alveare' (sperimentale)"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
 
         <!-- Smart Display Mode Switch -->
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switchKeepScreenOn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:minHeight="48dp"
             android:checked="true"
             android:text="@string/settings_smart_display"
             android:textColor="@color/text_primary"
             android:textSize="13sp" />
 
-        <!-- Memory & Context Management -->
+        <!-- Memory & Context Turns -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:text="🧠 Gestione Memoria Conversazione"
             android:textColor="@color/primary"
             android:textSize="14sp"
@@ -285,7 +397,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:background="@drawable/bg_card"
             android:orientation="vertical"
             android:padding="12dp">
@@ -302,7 +414,8 @@
                 android:id="@+id/seekContextTurns"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:minHeight="48dp"
+                android:layout_marginTop="4dp"
                 android:max="14"
                 android:progress="4" />
 
@@ -310,26 +423,26 @@
                 android:id="@+id/btnClearMemoryNow"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="🗑️ Cancella Memoria Ora"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:text="🗑️ Cancella Cronologia e Memoria Ora"
                 android:textColor="@color/accent_red"
                 android:textSize="12sp"
                 app:strokeColor="@color/accent_red" />
         </LinearLayout>
 
-        <!-- Action Buttons -->
+        <!-- Dialog Action Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCancel"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="@string/action_cancel"
                 android:textColor="@color/text_muted" />
@@ -337,7 +450,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSave"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="@string/action_save"

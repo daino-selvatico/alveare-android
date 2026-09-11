@@ -5,9 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
-    android:padding="16dp">
+    android:padding="12dp">
 
-    <!-- Top Navigation & Status Bar -->
+    <!-- Top Navigation & Room Status Bar -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -25,11 +25,12 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/tvAppName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
@@ -46,19 +47,18 @@
                 android:textSize="11sp" />
         </LinearLayout>
 
-        <!-- Connection Status Pill (Clickable to reconnect) -->
+        <!-- Connection Status Pill (Clickable) -->
         <LinearLayout
             android:id="@+id/statusPill"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="36dp"
             android:background="@drawable/bg_pill_status"
             android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="6dp">
+            android:paddingHorizontal="10dp">
 
             <View
                 android:id="@+id/statusDot"
@@ -82,29 +82,80 @@
                 android:layout_height="14dp"
                 android:layout_marginStart="4dp"
                 android:src="@drawable/ic_refresh"
-                app:tint="@color/text_muted" />
+                app:tint="@color/text_muted"
+                android:contentDescription="@string/action_reconnect" />
         </LinearLayout>
 
-        <!-- Clear Memory / Delete Chat Button -->
+        <!-- Privacy Mute Quick Toggle Button (>=48dp touch target) -->
+        <ImageButton
+            android:id="@+id/btnQuickMute"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_privacy_mute"
+            android:src="@drawable/ic_mic"
+            app:tint="@color/text_secondary" />
+
+        <!-- Clear Memory / Delete Chat Button (>=48dp touch target) -->
         <ImageButton
             android:id="@+id/btnClearMemory"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Cancella Memoria / Pulisci Chat"
+            android:contentDescription="@string/action_clear_memory"
             android:src="@drawable/ic_delete"
             app:tint="@color/text_muted" />
 
-        <!-- Settings Button -->
+        <!-- Settings Button (>=48dp touch target) -->
         <ImageButton
             android:id="@+id/btnSettings"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="2dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/action_settings"
-            android:src="@drawable/ic_settings" />
+            android:src="@drawable/ic_settings"
+            app:tint="@color/text_secondary" />
+    </LinearLayout>
+
+    <!-- Two-Mode Selector (Assistente vs Live) -->
+    <LinearLayout
+        android:id="@+id/layoutModeSelector"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_card"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="3dp"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeAssistant"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="🤖 Assistente"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnModeLive"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="⚡ Live (Continuo)"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
     </LinearLayout>
 
     <!-- Disconnected Warning Banner (Prominent banner when offline) -->
@@ -112,24 +163,25 @@
         android:id="@+id/layoutConnectionBanner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:background="@drawable/bg_card"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:visibility="visible"
-        app:layout_constraintTop_toBottomOf="@id/topBar">
+        android:padding="10dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/layoutModeSelector">
 
         <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:src="@drawable/ic_refresh"
-            app:tint="@color/primary" />
+            app:tint="@color/primary"
+            android:contentDescription="@string/action_reconnect" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -137,16 +189,16 @@
                 android:id="@+id/tvBannerTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Server Alveare Disconnesso"
+                android:text="@string/status_disconnected"
                 android:textColor="@color/primary"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvBannerSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Tocca per connetterti al server in LAN"
+                android:text="Tocca per riconnettere il satellite"
                 android:textColor="@color/text_muted"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -156,20 +208,21 @@
             style="@style/Widget.MaterialComponents.Button"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:paddingHorizontal="14dp"
+            android:minHeight="48dp"
+            android:paddingHorizontal="12dp"
             android:paddingVertical="0dp"
             android:text="Connetti"
             android:textColor="@color/on_primary"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:backgroundTint="@color/primary"
             app:cornerRadius="18dp" />
     </LinearLayout>
 
-    <!-- Central Glowing Visualizer Orb (Compact size to leave room for Chat History) -->
+    <!-- Central Visualizer Orb & State Indicator -->
     <com.alveare.satellite.ui.VisualizerView
         android:id="@+id/visualizerView"
-        android:layout_width="110dp"
-        android:layout_height="110dp"
+        android:layout_width="90dp"
+        android:layout_height="90dp"
         android:layout_marginTop="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -181,6 +234,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
+        android:gravity="center"
         android:text="@string/status_ready"
         android:textColor="@color/text_primary"
         android:textSize="14sp"
@@ -189,12 +243,12 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/visualizerView" />
 
-    <!-- Badges Row (Listen Mode / TTS Mode / Latency) -->
+    <!-- Badges Row -->
     <LinearLayout
         android:id="@+id/badgesRow"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:gravity="center"
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
@@ -202,30 +256,15 @@
         app:layout_constraintTop_toBottomOf="@id/tvStateLabel">
 
         <TextView
-            android:id="@+id/badgeListenMode"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_pill_status"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="3dp"
-            android:text="🎙️ Sempre in ascolto"
-            android:textColor="@color/secondary"
-            android:textSize="11sp" />
-
-        <TextView
             android:id="@+id/badgeTtsMode"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
             android:background="@drawable/bg_pill_status"
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
-            android:text="🔊 TTS: Kokoro 24kHz"
+            android:text="🔊 Kokoro 24kHz"
             android:textColor="@color/primary"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
         <TextView
             android:id="@+id/badgeLatency"
@@ -237,7 +276,7 @@
             android:paddingVertical="3dp"
             android:text="⚡ 0 ms"
             android:textColor="@color/text_muted"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:visibility="gone" />
 
         <TextView
@@ -253,7 +292,7 @@
             android:paddingVertical="3dp"
             android:text="🧠 Memoria: 0 turni"
             android:textColor="@color/accent_blue"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
     <!-- Live Microphone Level & Activity Bar -->
@@ -261,10 +300,10 @@
         android:id="@+id/layoutMicLevel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
+        android:paddingHorizontal="16dp"
         app:layout_constraintTop_toBottomOf="@id/badgesRow">
 
         <TextView
@@ -287,19 +326,19 @@
             android:progressTint="@color/secondary" />
     </LinearLayout>
 
-    <!-- Real-Time Scrollable Conversation History (Chat RecyclerView) -->
+    <!-- Scrollable Conversation History -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvChatHistory"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="6dp"
         android:clipToPadding="false"
         android:paddingBottom="4dp"
         app:layout_constraintBottom_toTopOf="@id/bottomControls"
         app:layout_constraintTop_toBottomOf="@id/layoutMicLevel" />
 
-    <!-- Empty State View (Shown when no chat messages) -->
+    <!-- Empty Chat Hint -->
     <LinearLayout
         android:id="@+id/layoutEmptyChat"
         android:layout_width="wrap_content"
@@ -313,57 +352,94 @@
         app:layout_constraintTop_toBottomOf="@id/layoutMicLevel">
 
         <ImageView
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:src="@drawable/ic_mic"
-            app:tint="@color/text_muted" />
+            app:tint="@color/text_muted"
+            android:contentDescription="@string/action_tap_to_speak" />
 
         <TextView
+            android:id="@+id/tvEmptyChatHint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:gravity="center"
-            android:text="Nessuna conversazione ancora\nParla o tocca il microfono per iniziare"
+            android:text="Nessuna conversazione ancora\nDì 'Ehi Alveare' o tocca il microfono"
             android:textColor="@color/text_muted"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Bottom Action Controls -->
-    <RelativeLayout
+    <!-- Bottom Controls: Privacy Mute, Big Central Mic, Interrupt/Stop -->
+    <LinearLayout
         android:id="@+id/bottomControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="4dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Floating Mic Button -->
+        <!-- Privacy Mute Button (>=48dp touch target) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBottomMute"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:insetLeft="0dp"
+            android:insetTop="0dp"
+            android:insetRight="0dp"
+            android:insetBottom="0dp"
+            android:contentDescription="@string/action_privacy_mute"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_mic"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="@color/text_secondary"
+            app:strokeColor="@color/surface_card_stroke" />
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Big Mic Activation Button (Tap-to-Talk) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/btnMic"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
             android:contentDescription="@string/action_tap_to_speak"
             android:src="@drawable/ic_mic"
             app:backgroundTint="@color/primary"
-            app:elevation="8dp"
+            app:elevation="6dp"
             app:fabSize="normal"
             app:tint="@color/on_primary" />
 
-        <!-- Floating Interrupt Button (Appears during assistant speech or processing) -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Interrupt / Stop Button (>=48dp touch target) -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnInterrupt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_marginStart="24dp"
-            android:layout_toEndOf="@id/btnMic"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:insetLeft="0dp"
+            android:insetTop="0dp"
+            android:insetRight="0dp"
+            android:insetBottom="0dp"
             android:contentDescription="@string/action_interrupt"
-            android:src="@drawable/ic_refresh"
-            android:visibility="gone"
+            android:visibility="invisible"
             app:backgroundTint="@color/accent_red"
-            app:elevation="4dp"
-            app:fabSize="mini"
-            app:tint="@color/white" />
-    </RelativeLayout>
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_stop"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="@color/white" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
