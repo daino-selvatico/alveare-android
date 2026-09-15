@@ -168,7 +168,12 @@ class MainActivity : AppCompatActivity(), AlveareSatelliteService.ServiceListene
             showClearMemoryDialog()
         }
 
-        // 6. Settings Button
+        // 6. Settings & Control Panel Buttons
+        binding.btnControlPanel.setOnClickListener {
+            val intent = Intent(this, ControlPanelActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.btnSettings.setOnClickListener {
             showSettingsDialog()
         }

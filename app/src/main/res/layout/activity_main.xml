@@ -107,6 +107,16 @@
             android:src="@drawable/ic_delete"
             app:tint="@color/text_muted" />
 
+        <!-- Control Panel Dashboard Button (>=48dp touch target) -->
+        <ImageButton
+            android:id="@+id/btnControlPanel"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_control_panel"
+            android:src="@drawable/ic_dashboard"
+            app:tint="@color/primary" />
+
         <!-- Settings Button (>=48dp touch target) -->
         <ImageButton
             android:id="@+id/btnSettings"

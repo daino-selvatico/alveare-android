@@ -59,4 +59,18 @@
     <string name="settings_wake_word_delete">Elimina Modello</string>
     <string name="settings_smart_display">Modalità Smart Display (Schermo sempre acceso)</string>
     <string name="settings_context_turns">Memoria di Contesto Alveare (turni)</string>
+
+    <!-- Control Panel -->
+    <string name="action_control_panel">Pannello di Controllo Alveare</string>
+    <string name="control_panel_title">Control Panel Alveare</string>
+    <string name="control_panel_slots">Slot di Esecuzione Neurale</string>
+    <string name="control_panel_telemetry">Telemetria Hardware</string>
+    <string name="control_panel_tuning">Tuning Inferenzazione</string>
+    <string name="control_panel_logs">Log di Sistema</string>
+    <string name="control_panel_save_tuning">Salva Parametri</string>
+    <string name="control_panel_start_all">Avvia Tutto</string>
+    <string name="control_panel_stop_all">Arresta Tutto</string>
+    <string name="slot_start">Avvia</string>
+    <string name="slot_stop">Arresta</string>
+    <string name="slot_restart">Riavvia</string>
 </resources>
